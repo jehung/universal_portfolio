@@ -1,6 +1,6 @@
 # universal_portfolio
 
-## Sumamry
+## Summary
 
 ## Motivation of Code
 
