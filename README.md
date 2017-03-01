@@ -23,7 +23,7 @@ In `universal_beat_this.py`, you can specify your own beanchmark investment, and
 
 ## Technical Background
 
-The technical background was inspired by Thomas M. Cover's Universal Portfolio theory. He demonstrated an algorithm for portfolio selection that outperforms the best stock in the market by actively rebalancing the weights of the investments daily. However, his algorithm had not taken into consideration the transaction costs.
+The technical background was inspired by [Thomas M. Cover's Universal Portfolio theory](http://www-isl.stanford.edu/~cover/papers/paper93.pdf) . He demonstrated an algorithm for portfolio selection that outperforms the best stock in the market by actively rebalancing the weights of the investments daily. However, his algorithm had not taken into consideration the transaction costs.
 
 This Python code builds upon Cover's theory of actively balancing, and seeks to find the investment outcomes of different strategies such as old-fashioned buy-and-hold, as well as active rebalancing - while comparing each of the investment outcome against a benchmark.
 
