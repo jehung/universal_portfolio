@@ -32,3 +32,6 @@ This Python code builds upon Cover's theory of actively balancing, and seeks to 
 I welcome your contribution! Portfolio selection is an NP-hard problem, and that can partially explain that the selection process is often an subjective process. Over time, the goal of this quantitative finance project is to show that it is very difficult, if not impossible, to outperform a diversified basket of investment under any strategy, and therefore mitigating the need for a choice set of investments.
 
 ## License 
+
+The content of this repository is licensed under a
+[Creative Commons Attribution License](http://creativecommons.org/licenses/by/3.0/us/)
