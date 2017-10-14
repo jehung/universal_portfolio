@@ -6,6 +6,11 @@ import numpy as np
 
 
 def load_data(results_path):
+    """
+    Process all downloaded files into one dataframe
+    :param results_path: type string, denotes the name of directory where downloaded files are
+    :return: pandas dataframe
+    """
     files = os.listdir(results_path)
     results_dicts = []
     for file_name in files:
@@ -22,6 +27,15 @@ def load_data(results_path):
 
     return a
 
+
+
+def set_params():
+    """"
+
+    :return:
+    """
+
+    pass
 
 
 if __name__ == "__main__":
