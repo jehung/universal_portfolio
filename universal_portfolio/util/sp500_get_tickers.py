@@ -52,7 +52,7 @@ def get_data_from_yahoo(reload_sp500=False):
         else:
             print('Already have {}'.format(ticker))
 
-    print('Total number of tickers (S&P500): ' + len(tickers))
+    print('Total number of tickers (S&P500): ' + str(len(tickers)))
     print('Total number of processed tickers (S&P500): ' + ticker_count)
 
 
