@@ -17,7 +17,7 @@ def initialize(start, tickers):
     X = pd.DataFrame()
 
     for ticker in tickers:
-        print ticker
+        print(ticker)
         #try:
         data = web.DataReader(ticker, 'yahoo', start)
         data["Ticker"] = ticker
@@ -50,7 +50,6 @@ def binnings(n, k, cache={}):
     cache[args] = result
     return result
 
-
 def permute(df):
     df = df.sample(frac=1).reset_index(drop=True)
     return df
@@ -69,8 +68,7 @@ def resample(df, n=None):
 
 #X, r, c = initialize(start, tickers)
 #x1 = resample(X, r)
-#print x1
-
+#print(x1)
 
 def analyze(df):
     S = np.ones(r) * 0
@@ -85,10 +83,9 @@ def analyze(df):
 
 X, r, c = initialize(start, tickers)
 
-print 'ans', X
+print('ans', X)
 bk = analyze(X.fillna(0))
-print bk
-
+print(bk)
 
 def update_weights(tickers, r, c, seed, bk, df):
     weights = np.ones((r, c))/(len(tickers)-1)
@@ -98,18 +95,17 @@ def update_weights(tickers, r, c, seed, bk, df):
     universal_values = seed*bk*np.cumprod(df.iloc[:, 1:len(tickers)], axis=0)
     portfolio_value_t = np.sum(traditional_values, axis=1)
     portfolio_value_u = np.sum(universal_values, axis=1)
-    vol_portfolio_value_t = pd.expanding_std(portfolio_value_t, min_periods=1)/pd.expanding_mean(portfolio_value_t, min_periods=1)
-    vol_portfolio_value_u = pd.expanding_std(portfolio_value_u, min_periods=1)/pd.expanding_mean(portfolio_value_t, min_periods=1)
-    vol_bench = pd.expanding_std(bench, min_periods=1)/pd.expanding_mean(portfolio_value_t, min_periods=1)
-    #print 'vol_portfolio_value_t', vol_portfolio_value_t
-    #print 'vol_portfolio_value_u', vol_portfolio_value_u
+    vol_portfolio_value_t = portfolio_value_t.expanding(min_periods=1).std()/portfolio_value_t.expanding(min_periods=1).mean()
+    vol_portfolio_value_u = portfolio_value_u.expanding(min_periods=1).std()/portfolio_value_t.expanding(min_periods=1).mean()
+    vol_bench = bench.expanding(min_periods=1).std()/portfolio_value_t.expanding(min_periods=1).mean()
+    #print('vol_portfolio_value_t', vol_portfolio_value_t)
+    #print('vol_portfolio_value_u', vol_portfolio_value_u)
     #cbcprint 'vol_bench', vol_bench
     return traditional_values, universal_values, bench, portfolio_value_t, portfolio_value_u, vol_portfolio_value_t, vol_portfolio_value_u, vol_bench
 
 #X1 = permute(X)
 #bk = analyze(X1)
 #traditional_values, universal_values, bench, portfolio_value_t, portfolio_value_u, vol_portfolio_value_t, vol_portfolio_value_u, vol_bench = update_weights(tickers, r, c, 12500, bk, X1)
-
 
 no_sim = 100
 
