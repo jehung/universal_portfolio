@@ -9,6 +9,11 @@ import pandas as pd
 import numpy as np
 from sklearn.manifold import TSNE
 from time import clock
+from mimicry.mimicry import mimic as mimic
+import networkx as nx
+import random
+from scipy import stats
+from sklearn.metrics import mutual_info_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
@@ -23,6 +28,36 @@ from util import process_data
 import tensorflow as tf
 from tensorflow.contrib.learn.python.learn.estimators.dnn  import DNNClassifier
 from tensorflow.contrib.layers import real_valued_column
+
+
+
+
+
+def MIMIC_nn(train):
+    samples = train[0:4500]
+    print(samples)
+
+    distribution = mimic.Distribution(samples)
+    print('distribution', distribution)
+    distribution._generate_bayes_net()
+
+    for node_ind in distribution.bayes_net.nodes():
+        print(distribution.bayes_net.node[node_ind])
+
+    pos = nx.spring_layout(distribution.spanning_graph)
+
+    edge_labels = dict(
+        [((u, v,), d['weight'])
+         for u, v, d in distribution.spanning_graph.edges(data=True)])
+
+    nx.draw_networkx(distribution.spanning_graph, pos)
+    nx.draw_networkx_edge_labels(
+        distribution.spanning_graph,
+        pos,
+        edge_labels=edge_labels)
+
+    plt.show()
+
 
 
 
@@ -176,17 +211,26 @@ class DNNModel():
                 return prediction_conf
 
 
+
+
+
 if __name__ == '__main__':
     datapath = 'util/stock_dfs/'
     all = process_data.merge_all_data(datapath)
     inputdf, targetdf = process_data.embed(all)
     labeled = process_data.process_target(targetdf)
 
+    # for MIMIC in continuous space
+
+
+
+
     '''
     # for neural network in sklearn
     clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
     '''
 
+    '''
     # for baseline dnn in tensorflow
     labeled['tf_class'] = labeled['multi_class']
     num_features = len(inputdf.columns)
@@ -263,3 +307,4 @@ if __name__ == '__main__':
                 else:
                     final_probs = np.concatenate((final_probs, probs), axis=0)
             prediction_conf = final_probs[np.argmax(final_probs, 1)]
+    '''
