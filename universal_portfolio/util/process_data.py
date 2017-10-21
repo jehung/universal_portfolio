@@ -86,6 +86,7 @@ def process_target(df):
 
 
 
+'''
 if __name__ == "__main__":
     all = merge_all_data(datapath)
     inputdf, targetdf = embed(all)
@@ -93,3 +94,4 @@ if __name__ == "__main__":
 
     print(inputdf.head())
     print(labeled.head())
+'''
