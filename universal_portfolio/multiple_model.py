@@ -18,13 +18,16 @@ from collections import defaultdict
 import sklearn.metrics as metrics
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer, accuracy_score
+from sklearn.metrics import make_scorer, accuracy_score, classification_report, confusion_matrix
 from util import process_data
+import tensorflow as tf
+from tensorflow.contrib.learn.python.learn.estimators.dnn  import DNNClassifier
+from tensorflow.contrib.layers import real_valued_column
 
 
 
 
-def clustering(n, X, y):
+def baseline_nn(n, X, y):
     mlp = MLPClassifier(solver='sgd', learning_rate='invscaling', alpha=1e-5, shuffle=True, early_stopping=True, activation='relu',
                         verbose=True)
     parameters = {
@@ -52,11 +55,211 @@ def clustering(n, X, y):
 
 
 
+def evaluate_baselineNN(input, labels):
+    test_size=600
+    print(classification_report(labels['multi_class'][-test_size:], res.predict(input[-test_size:])))
+    print(confusion_matrix(labels['multi_class'][-test_size:], res.predict(input[-test_size:])))
+
+    labels['predicted_action'] = list(map(lambda x: -1 if x < 5 else 0 if x == 5 else 1, res.predict(input)))
+    print(confusion_matrix(labels['class'][-test_size:], labels['predicted_action'][-test_size:]))
+
+    labels['pred_return'] = labels['predicted_action'] * labels['return']
+
+    Res = labels[-test_size:][['return', 'act_return', 'pred_return']].cumsum()
+    Res[0] = 0
+    Res.plot()
+
+
+
+class DNNModel():
+    def __init__(self):
+        global_step = tf.contrib.framework.get_or_create_global_step()
+        self.input_data = tf.placeholder(dtype=tf.float32, shape=[None, num_features])
+        self.target_data = tf.placeholder(dtype=tf.int32, shape=[None])
+        self.dropout_prob = tf.placeholder(dtype=tf.float32, shape=[])
+        with tf.variable_scope("ff"):
+            droped_input = tf.nn.dropout(self.input_data, keep_prob=self.dropout_prob)
+
+            layer_1 = tf.contrib.layers.fully_connected(
+                num_outputs=hidden_1_size,
+                inputs=droped_input,
+            )
+            layer_2 = tf.contrib.layers.fully_connected(
+                num_outputs=hidden_2_size,
+                inputs=layer_1,
+            )
+            self.logits = tf.contrib.layers.fully_connected(
+                num_outputs=num_classes,
+                activation_fn=None,
+                inputs=layer_2,
+            )
+        with tf.variable_scope("loss"):
+            self.losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.target_data, logits=self.logits)
+            mask = (1 - tf.sign(1 - self.target_data))  # Don't give credit for flat days
+            mask = tf.cast(mask, tf.float32)
+            self.loss = tf.reduce_sum(self.losses)
+
+        with tf.name_scope("train"):
+            opt = tf.train.AdamOptimizer(lr)
+            gvs = opt.compute_gradients(self.loss)
+            self.train_op = opt.apply_gradients(gvs, global_step=global_step)
+
+        with tf.name_scope("predictions"):
+            self.probs = tf.nn.softmax(self.logits)
+            self.predictions = tf.argmax(self.probs, 1)
+            correct_pred = tf.cast(tf.equal(self.predictions, tf.cast(self.target_data, tf.int64)), tf.float64)
+            self.accuracy = tf.reduce_mean(correct_pred)
+
+
+    def dnn(self, train, NUM_EPOCHS, NUM_TRAIN_BATCHES, BATCH_SIZE):
+        with tf.Graph().as_default():
+            #model = Model()
+            input_ = train[0]
+            target = train[1]
+            with tf.Session() as sess:
+                init = tf.initialize_all_variables()
+                sess.run([init])
+                epoch_loss = 0
+                for e in range(NUM_EPOCHS):
+                    if epoch_loss > 0 and epoch_loss < 1:
+                        break
+                    epoch_loss = 0
+                    for batch in range(0, NUM_TRAIN_BATCHES):
+                        start = batch * BATCH_SIZE
+                        end = start + BATCH_SIZE
+                        feed = {
+                            self.input_data: input_[start:end],
+                            self.target_data: target[start:end],
+                            self.dropout_prob: 0.9
+                        }
+
+                        _, loss, acc = sess.run(
+                            [
+                                self.train_op,
+                                self.loss,
+                                self.accuracy,
+                            ]
+                            , feed_dict=feed
+                        )
+                        epoch_loss += loss
+                    print('step - {0} loss - {1} acc - {2}'.format((1 + batch + NUM_TRAIN_BATCHES * e), epoch_loss, acc))
+
+                print('done training')
+                final_preds = np.array([])
+                final_probs = None
+                for batch in range(0, NUM_VAL_BATCHES):
+
+                    start = batch * BATCH_SIZE
+                    end = start + BATCH_SIZE
+                    feed = {
+                        self.input_data: val[0][start:end],
+                        self.target_data: val[1][start:end],
+                        self.dropout_prob: 1
+                    }
+
+                    acc, preds, probs = sess.run(
+                        [
+                            self.accuracy,
+                            self.predictions,
+                            self.probs
+                        ]
+                        , feed_dict=feed
+                    )
+                    print(acc)
+                    final_preds = np.concatenate((final_preds, preds), axis=0)
+                    if final_probs is None:
+                        final_probs = probs
+                    else:
+                        final_probs = np.concatenate((final_probs, probs), axis=0)
+                prediction_conf = final_probs[np.argmax(final_probs, 1)]
+
+                return prediction_conf
+
+
 if __name__ == '__main__':
     datapath = 'util/stock_dfs/'
     all = process_data.merge_all_data(datapath)
     inputdf, targetdf = process_data.embed(all)
     labeled = process_data.process_target(targetdf)
 
-    clf, score, gs = clustering(len(inputdf.columns), inputdf, labeled['multi_class'])
+    '''
+    # for neural network in sklearn
+    clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
+    '''
 
+    # for baseline dnn in tensorflow
+    labeled['tf_class'] = labeled['multi_class']
+    num_features = len(inputdf.columns)
+    dropout = 0.2
+    hidden_1_size = 1000
+    hidden_2_size = 250
+    num_classes = labeled.tf_class.nunique()
+    NUM_EPOCHS = 100
+    BATCH_SIZE = 50
+    lr = 0.0001
+    test_size=600
+    train = (inputdf[:-test_size].values, labeled.tf_class[:-test_size].values)
+    val = (inputdf[-test_size:].values, labeled.tf_class[-test_size:].values)
+    NUM_TRAIN_BATCHES = int(len(train[0]) / BATCH_SIZE)
+    NUM_VAL_BATCHES = int(len(val[1]) / BATCH_SIZE)
+
+    with tf.Graph().as_default():
+        model = DNNModel()
+        input_ = train[0]
+        target = train[1]
+        with tf.Session() as sess:
+            init = tf.initialize_all_variables()
+            sess.run([init])
+            epoch_loss = 0
+            for e in range(NUM_EPOCHS):
+                if epoch_loss > 0 and epoch_loss < 1:
+                    break
+                epoch_loss = 0
+                for batch in range(0, NUM_TRAIN_BATCHES):
+                    start = batch * BATCH_SIZE
+                    end = start + BATCH_SIZE
+                    feed = {
+                        model.input_data: input_[start:end],
+                        model.target_data: target[start:end],
+                        model.dropout_prob: 0.9
+                    }
+
+                    _, loss, acc = sess.run(
+                        [
+                            model.train_op,
+                            model.loss,
+                            model.accuracy,
+                        ]
+                        , feed_dict=feed
+                    )
+                    epoch_loss += loss
+                print('step - {0} loss - {1} acc - {2}'.format((1 + batch + NUM_TRAIN_BATCHES * e), epoch_loss, acc))
+
+            print('done training')
+            final_preds = np.array([])
+            final_probs = None
+            for batch in range(0, NUM_VAL_BATCHES):
+
+                start = batch * BATCH_SIZE
+                end = start + BATCH_SIZE
+                feed = {
+                    model.input_data: val[0][start:end],
+                    model.target_data: val[1][start:end],
+                    model.dropout_prob: 1
+                }
+
+                acc, preds, probs = sess.run(
+                    [
+                        model.accuracy,
+                        model.predictions,
+                        model.probs
+                    ]
+                    , feed_dict=feed
+                )
+                print(acc)
+                final_preds = np.concatenate((final_preds, preds), axis=0)
+                if final_probs is None:
+                    final_probs = probs
+                else:
+                    final_probs = np.concatenate((final_probs, probs), axis=0)
+            prediction_conf = final_probs[np.argmax(final_probs, 1)]
