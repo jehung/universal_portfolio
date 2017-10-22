@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.manifold import TSNE
 from time import clock
+import matplotlib.pyplot as plt
 from mimicry.mimicry import mimic as mimic
 import networkx as nx
 import random
@@ -81,32 +82,6 @@ FixedIterationTrainer = jp.JPackage('shared').FixedIterationTrainer
 SimulatedAnnealing = jp.JPackage('opt').SimulatedAnnealing
 StandardGeneticAlgorithm = jp.JPackage('opt').ga.StandardGeneticAlgorithm
 MIMIC = jp.JPackage('opt').prob.MIMIC
-
-
-
-
-def errorOnDataSet(network,ds,measure):
-    N = len(ds)
-    error = 0.
-    correct = 0
-    incorrect = 0
-    for instance in ds:
-        network.setInputValues(instance.getData())
-        network.run()
-        actual = instance.getLabel().getContinuous()
-        predicted = network.getOutputValues().get(0)
-        predicted = max(min(predicted,1),0)
-        if abs(predicted - actual) < 0.5:
-            correct += 1
-        else:
-            incorrect += 1
-        output = instance.getLabel()
-        output_values = network.getOutputValues()
-        example = Instance(output_values, Instance(output_values.get(0)))
-        error += measure.value(output, example)
-    MSE = error/float(N)
-    acc = correct/float(correct+incorrect)
-    return MSE,acc
 
 
 
@@ -198,6 +173,21 @@ class DNNModel():
 
 
 if __name__ == '__main__':
+    # for MIMIC in continuous space
+    datapath = 'util/stock_dfs/'
+    all = process_data.merge_all_data(datapath)
+    inputdf, targetdf = process_data.embed(all)
+    labeled = process_data.process_target(targetdf)
+
+    domain = [(0, 1)] * len(inputdf)
+    m = mimic.Mimic(domain, sum, samples=500)
+    for i in range(25):
+        print(np.average([sum(sample) for sample in m.fit()[:5]]))
+        m.fit()
+    results = m.fit()
+    print(results)
+
+    '''
     # for neural network in sklearn
     datapath = 'util/stock_dfs/'
     all = process_data.merge_all_data(datapath)
@@ -207,7 +197,7 @@ if __name__ == '__main__':
     clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
 
 
-'''    
+    
     # for baseline dnn in tensorflow
     labeled['tf_class'] = labeled['multi_class']
     num_features = len(inputdf.columns)
@@ -284,4 +274,4 @@ if __name__ == '__main__':
                 else:
                     final_probs = np.concatenate((final_probs, probs), axis=0)
             prediction_conf = final_probs[np.argmax(final_probs, 1)]
-    '''
+'''
