@@ -33,35 +33,6 @@ from tensorflow.contrib.layers import real_valued_column
 
 
 
-def MIMIC_nn(train):
-    samples = train[0:4500]
-    print(samples)
-
-    distribution = mimic.Distribution(samples)
-    print('distribution', distribution)
-    distribution._generate_bayes_net()
-
-    for node_ind in distribution.bayes_net.nodes():
-        print(distribution.bayes_net.node[node_ind])
-
-    pos = nx.spring_layout(distribution.spanning_graph)
-
-    edge_labels = dict(
-        [((u, v,), d['weight'])
-         for u, v, d in distribution.spanning_graph.edges(data=True)])
-
-    nx.draw_networkx(distribution.spanning_graph, pos)
-    nx.draw_networkx_edge_labels(
-        distribution.spanning_graph,
-        pos,
-        edge_labels=edge_labels)
-
-    plt.show()
-
-
-
-
-
 def baseline_nn(n, X, y):
     mlp = MLPClassifier(solver='sgd', learning_rate='invscaling', alpha=1e-5, shuffle=True, early_stopping=True, activation='relu',
                         verbose=True)
@@ -221,16 +192,38 @@ if __name__ == '__main__':
     labeled = process_data.process_target(targetdf)
 
     # for MIMIC in continuous space
+    samples = inputdf
+    domain = [(0, 1)] * len(inputdf.columns)
+
+    m = mimic.Mimic(domain, sum, samples=1000)
+    distribution = mimic.Distribution(samples)
+    print('distribution', distribution)
+    distribution._generate_bayes_net()
+
+    for node_ind in distribution.bayes_net.nodes():
+        print(distribution.bayes_net.node[node_ind])
+
+    pos = nx.spring_layout(distribution.spanning_graph)
+
+    edge_labels = dict(
+        [((u, v,), d['weight'])
+         for u, v, d in distribution.spanning_graph.edges(data=True)])
+
+    nx.draw_networkx(distribution.spanning_graph, pos)
+    nx.draw_networkx_edge_labels(
+        distribution.spanning_graph,
+        pos,
+        edge_labels=edge_labels)
+
+    plt.show()
 
 
-
-
-    '''
+'''
     # for neural network in sklearn
     clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
-    '''
 
-    '''
+
+    
     # for baseline dnn in tensorflow
     labeled['tf_class'] = labeled['multi_class']
     num_features = len(inputdf.columns)
