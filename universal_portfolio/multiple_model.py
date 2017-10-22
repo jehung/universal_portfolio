@@ -28,8 +28,85 @@ from util import process_data
 import tensorflow as tf
 from tensorflow.contrib.learn.python.learn.estimators.dnn  import DNNClassifier
 from tensorflow.contrib.layers import real_valued_column
+import time
+from time import clock
+from itertools import product
+from array import *
+import jpype as jp
+sys.path.append("C:/MOOCs/CS 7641/proj2/ABAGAIL.jar")
+jp.startJVM(jp.getDefaultJVMPath(), '-ea', '-Djava.class.path=/Users/jennyhung/MathfreakData/School/OMSCS_ML/Assign2/abagail_py/ABAGAIL/ABAGAIL.jar')
+jp.java.io.FileReader
+jp.java.io.File
+jp.java.lang.String
+jp.java.lang.StringBuffer
+jp.java.lang.Boolean
+jp.java.util.Random
+jp.java.dist.DiscreteDependencyTree
+jp.java.dist.DiscreteUniformDistribution
+jp.java.opt.DiscreteChangeOneNeighbor
+jp.java.opt.EvaluationFunction
+jp.java.opt.EvaluationFunction
+jp.java.opt.HillClimbingProblem
+jp.java.opt.NeighborFunction
+jp.java.opt.RandomizedHillClimbing
+jp.java.opt.SimulatedAnnealing
+jp.java.opt.example.FourPeaksEvaluationFunction
+jp.java.opt.ga.CrossoverFunction
+jp.java.opt.ga.SingleCrossOver
+jp.java.opt.ga.DiscreteChangeOneMutation
+jp.java.opt.ga.GenericGeneticAlgorithmProblem
+jp.java.opt.GenericHillClimbingProblem
+jp.java.opt.ga.GeneticAlgorithmProblem
+jp.java.opt.ga.MutationFunction
+jp.java.opt.ga.StandardGeneticAlgorithm
+jp.java.opt.ga.UniformCrossOver
+jp.java.opt.prob.GenericProbabilisticOptimizationProblem
+jp.java.opt.prob.MIMIC
+jp.java.opt.prob.ProbabilisticOptimizationProblem
+jp.java.shared.FixedIterationTrainer
+jp.java.opt.example.ContinuousPeaksEvaluationFunction
 
 
+ContinuousPeaksEvaluationFunction = jp.JPackage('opt').example.ContinuousPeaksEvaluationFunction
+DiscreteUniformDistribution = jp.JPackage('dist').DiscreteUniformDistribution
+DiscreteChangeOneNeighbor = jp.JPackage('opt').DiscreteChangeOneNeighbor
+DiscreteChangeOneMutation = jp.JPackage('opt').ga.DiscreteChangeOneMutation
+SingleCrossOver = jp.JPackage('opt').ga.SingleCrossOver
+DiscreteDependencyTree = jp.JPackage('dist').DiscreteDependencyTree
+GenericHillClimbingProblem = jp.JPackage('opt').GenericHillClimbingProblem
+GenericGeneticAlgorithmProblem = jp.JPackage('opt').ga.GenericGeneticAlgorithmProblem
+GenericProbabilisticOptimizationProblem = jp.JPackage('opt').prob.GenericProbabilisticOptimizationProblem
+RandomizedHillClimbing = jp.JPackage('opt').RandomizedHillClimbing
+FixedIterationTrainer = jp.JPackage('shared').FixedIterationTrainer
+SimulatedAnnealing = jp.JPackage('opt').SimulatedAnnealing
+StandardGeneticAlgorithm = jp.JPackage('opt').ga.StandardGeneticAlgorithm
+MIMIC = jp.JPackage('opt').prob.MIMIC
+
+
+
+
+def errorOnDataSet(network,ds,measure):
+    N = len(ds)
+    error = 0.
+    correct = 0
+    incorrect = 0
+    for instance in ds:
+        network.setInputValues(instance.getData())
+        network.run()
+        actual = instance.getLabel().getContinuous()
+        predicted = network.getOutputValues().get(0)
+        predicted = max(min(predicted,1),0)
+        if abs(predicted - actual) < 0.5:
+            correct += 1
+        else:
+            incorrect += 1
+        output = instance.getLabel()
+        output_values = network.getOutputValues()
+        example = Instance(output_values, Instance(output_values.get(0)))
+        error += measure.value(output, example)
+    MSE = error/float(N)
+    acc = correct/float(correct+incorrect)
+    return MSE,acc
 
 
 
@@ -117,113 +194,20 @@ class DNNModel():
             self.accuracy = tf.reduce_mean(correct_pred)
 
 
-    def dnn(self, train, NUM_EPOCHS, NUM_TRAIN_BATCHES, BATCH_SIZE):
-        with tf.Graph().as_default():
-            #model = Model()
-            input_ = train[0]
-            target = train[1]
-            with tf.Session() as sess:
-                init = tf.initialize_all_variables()
-                sess.run([init])
-                epoch_loss = 0
-                for e in range(NUM_EPOCHS):
-                    if epoch_loss > 0 and epoch_loss < 1:
-                        break
-                    epoch_loss = 0
-                    for batch in range(0, NUM_TRAIN_BATCHES):
-                        start = batch * BATCH_SIZE
-                        end = start + BATCH_SIZE
-                        feed = {
-                            self.input_data: input_[start:end],
-                            self.target_data: target[start:end],
-                            self.dropout_prob: 0.9
-                        }
-
-                        _, loss, acc = sess.run(
-                            [
-                                self.train_op,
-                                self.loss,
-                                self.accuracy,
-                            ]
-                            , feed_dict=feed
-                        )
-                        epoch_loss += loss
-                    print('step - {0} loss - {1} acc - {2}'.format((1 + batch + NUM_TRAIN_BATCHES * e), epoch_loss, acc))
-
-                print('done training')
-                final_preds = np.array([])
-                final_probs = None
-                for batch in range(0, NUM_VAL_BATCHES):
-
-                    start = batch * BATCH_SIZE
-                    end = start + BATCH_SIZE
-                    feed = {
-                        self.input_data: val[0][start:end],
-                        self.target_data: val[1][start:end],
-                        self.dropout_prob: 1
-                    }
-
-                    acc, preds, probs = sess.run(
-                        [
-                            self.accuracy,
-                            self.predictions,
-                            self.probs
-                        ]
-                        , feed_dict=feed
-                    )
-                    print(acc)
-                    final_preds = np.concatenate((final_preds, preds), axis=0)
-                    if final_probs is None:
-                        final_probs = probs
-                    else:
-                        final_probs = np.concatenate((final_probs, probs), axis=0)
-                prediction_conf = final_probs[np.argmax(final_probs, 1)]
-
-                return prediction_conf
-
-
 
 
 
 if __name__ == '__main__':
+    # for neural network in sklearn
     datapath = 'util/stock_dfs/'
     all = process_data.merge_all_data(datapath)
     inputdf, targetdf = process_data.embed(all)
     labeled = process_data.process_target(targetdf)
 
-    # for MIMIC in continuous space
-    samples = inputdf
-    domain = [(0, 1)] * len(inputdf.columns)
-
-    m = mimic.Mimic(domain, sum, samples=1000)
-    distribution = mimic.Distribution(samples)
-    print('distribution', distribution)
-    distribution._generate_bayes_net()
-
-    for node_ind in distribution.bayes_net.nodes():
-        print(distribution.bayes_net.node[node_ind])
-
-    pos = nx.spring_layout(distribution.spanning_graph)
-
-    edge_labels = dict(
-        [((u, v,), d['weight'])
-         for u, v, d in distribution.spanning_graph.edges(data=True)])
-
-    nx.draw_networkx(distribution.spanning_graph, pos)
-    nx.draw_networkx_edge_labels(
-        distribution.spanning_graph,
-        pos,
-        edge_labels=edge_labels)
-
-    plt.show()
-
-
-'''
-    # for neural network in sklearn
     clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
 
 
-    
+'''    
     # for baseline dnn in tensorflow
     labeled['tf_class'] = labeled['multi_class']
     num_features = len(inputdf.columns)
