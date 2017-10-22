@@ -42,6 +42,7 @@ def merge_all_data(datapath):
     for f in os.listdir(datapath):
         filepath = os.path.join(datapath,f)
         if filepath.endswith('.csv'):
+            print(filepath)
             Res = make_inputs(filepath)
             all = all.append(Res)
 
@@ -60,7 +61,7 @@ def embed(df):
     inputDF = clean_and_flat[input_cols]
     targetDF = clean_and_flat[target_cols]
 
-    return inputDF, targetDF
+    return inputDF.values, targetDF
 
 
 def labeler(x):
