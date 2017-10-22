@@ -44,6 +44,7 @@ jp.java.opt.example.NeuralNetworkEvaluationFunction
 
 
 
+ContinuousPeaksEvaluationFunction = jp.JPackage('opt').example.ContinuousPeaksEvaluationFunction
 BackPropagationNetworkFactory = jp.JPackage('func').nn.backprop.BackPropagationNetworkFactory
 DataSet = jp.JPackage('shared').DataSet
 SumOfSquaresError = jp.JPackage('shared').SumOfSquaresError
@@ -58,18 +59,6 @@ GenericProbabilisticOptimizationProblem = jp.JPackage('opt').prob.GenericProbabi
 MIMIC = jp.JPackage('opt').prob.MIMIC
 FixedIterationTrainer = jp.JPackage('shared').FixedIterationTrainer
 
-
-
-INPUT_LAYER = 450
-OUTPUT_LAYER = 3
-TRAINING_ITERATIONS = 2001
-OUTFILE = 'MIMIC_LOG.txt'
-N=100
-T=49
-maxIters = 20001
-numTrials=5
-fill = [2] * N
-ranges = array('i', fill)
 
 
 
@@ -108,6 +97,15 @@ def run_mimic():
     """Run this experiment"""
     datapath = 'util/stock_dfs/'
     outfile = 'Results/randopts_@ALG@_@N@_LOG.txt'
+    # INPUT_LAYER = 451
+    # OUTPUT_LAYER = 3
+    OUTFILE = 'MIMIC_LOG.txt'
+    N = 100
+    T = 49
+    maxIters = 10
+    numTrials = 5
+    fill = [1] * N
+    ranges = array('i', fill)
     all = process_data.merge_all_data(datapath)
     train_set, val_set = get_cv_set(all)
 
@@ -118,15 +116,16 @@ def run_mimic():
     measure = SumOfSquaresError()
     relu = RELU()
     #rule = RPROPUpdateRule()
-    classification_network = factory.createClassificationNetwork([INPUT_LAYER, OUTPUT_LAYER],relu)
+    classification_network = factory.createClassificationNetwork([2241, len(train_labeled['multi_class'])],relu)
     data_set = DataSet(training_ints)
-    times = [0]
+    nnop = NeuralNetworkOptimizationProblem(data_set, classification_network, measure)
     for t in range(numTrials):
         for samples, keep, m in product([100], [50], [0.7, 0.9]):
             fname = outfile.replace('@ALG@', 'MIMIC{}_{}_{}'.format(samples, keep, m)).replace('@N@', str(t + 1))
             with open(fname, 'w') as f:
                 f.write('algo,trial,iterations,param1,param2,param3,fitness,time,fevals\n')
             ef = NeuralNetworkEvaluationFunction(classification_network, data_set, measure)
+            #ef = ContinuousPeaksEvaluationFunction(50)
             odd = DiscreteUniformDistribution(ranges)
             df = DiscreteDependencyTree(m, ranges)
             pop = GenericProbabilisticOptimizationProblem(ef, odd, df)
@@ -134,6 +133,7 @@ def run_mimic():
             fit = FixedIterationTrainer(mimic, 10)
             times = [0]
             for i in range(0, maxIters, 10):
+                print(i)
                 start = clock()
                 fit.train()
                 elapsed = time.clock() - start
