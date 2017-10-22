@@ -16,6 +16,7 @@ https://stackoverflow.com/questions/35736763/practical-use-of-java-class-jar-in-
 import os
 import csv
 import time
+from time import clock
 import sys
 sys.path.append('/Users/jennyhung/MathfreakData/School/OMSCS_ML/Assign2/abagail_py/ABAGAIL/ABAGAIL.jar')
 import jpype as jp
@@ -52,6 +53,10 @@ Instance = jp.JPackage('shared').Instance
 RELU = jp.JPackage('func').nn.activation.RELU
 NeuralNetworkEvaluationFunction = jp.JPackage('opt').example.NeuralNetworkEvaluationFunction
 DiscreteDependencyTree = jp.JPackage('dist').DiscreteDependencyTree
+DiscreteUniformDistribution = jp.JPackage('dist').DiscreteUniformDistribution
+GenericProbabilisticOptimizationProblem = jp.JPackage('opt').prob.GenericProbabilisticOptimizationProblem
+MIMIC = jp.JPackage('opt').prob.MIMIC
+FixedIterationTrainer = jp.JPackage('shared').FixedIterationTrainer
 
 
 
