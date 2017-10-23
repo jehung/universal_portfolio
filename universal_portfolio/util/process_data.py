@@ -46,22 +46,32 @@ def merge_all_data(datapath):
             Res = make_inputs(filepath)
             all = all.append(Res)
 
-    pivot_columns = all.columns[:-1]
-    P = all.pivot_table(index=all.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
-    return P
+    return all
 
 
 def embed(df):
-    mi = df.columns.tolist()
+    pivot_columns = df.columns[:-1]
+    P = df.pivot_table(index=df.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
+
+    mi = P.columns.tolist()
     new_ind = pd.Index(e[1] + '_' + e[0] for e in mi)
-    df.columns = new_ind
-    clean_and_flat = df.dropna(1)
+    P.columns = new_ind
+    clean_and_flat = P.dropna(axis=1)
+    print(clean_and_flat.head())
     target_cols = list(filter(lambda x: 'c1_c0' in x, clean_and_flat.columns.values))
     input_cols = list(filter(lambda x: 'c1_c0' not in x, clean_and_flat.columns.values))
     inputDF = clean_and_flat[input_cols]
     targetDF = clean_and_flat[target_cols]
 
-    return inputDF.values, targetDF
+    TotalReturn = ((1 - np.exp(targetDF)).sum(axis=1)) / len(targetDF.columns)  # If i put one dollar in each stock at the close, this is how much I'd get back
+
+    Labeled = pd.DataFrame()
+    Labeled['return'] = TotalReturn
+    Labeled['class'] = TotalReturn.apply(labeler, 1)
+    Labeled['multi_class'] = pd.qcut(TotalReturn, 11, labels=range(11))
+    pd.qcut(TotalReturn, 5).unique()
+
+    return inputDF, Labeled
 
 
 def labeler(x):
