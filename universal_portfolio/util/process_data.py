@@ -49,13 +49,14 @@ def merge_all_data(datapath):
     return all
 
 
-def embed(df):
+def embed(df, str):
+    "str: choice of return, class, multi_class"
     pivot_columns = df.columns[:-1]
     P = df.pivot_table(index=df.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
-
     mi = P.columns.tolist()
     new_ind = pd.Index(e[1] + '_' + e[0] for e in mi)
     P.columns = new_ind
+    print(P.columns)
     clean_and_flat = P.dropna(axis=1)
     print(clean_and_flat.head())
     target_cols = list(filter(lambda x: 'c1_c0' in x, clean_and_flat.columns.values))
@@ -73,7 +74,7 @@ def embed(df):
     Labeled['multi_class'] = pd.qcut(TotalReturn, 11, labels=range(11))
     pd.qcut(TotalReturn, 5).unique()
 
-    return inputDF, Labeled
+    return inputDF, Labeled[str]
 
 
 def labeler(x):
