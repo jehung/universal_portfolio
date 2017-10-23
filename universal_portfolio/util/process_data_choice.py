@@ -53,34 +53,18 @@ def embed(df):
     "str: choice of return, class, multi_class"
     pivot_columns = df.columns[:-1]
     P = df.pivot_table(index=df.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
-    print(P.head())
-    a = P.stack(0).reset_index()
-    '''
-    mi = P.columns.tolist()
-    print(mi)
-    new_ind = pd.Index(e[1] + '_' + e[0] for e in mi)
-    P.columns = new_ind
-    print(P.columns)
-    clean_and_flat = P.dropna(axis=1)
-    print(clean_and_flat.head())
-    target_cols = list(filter(lambda x: 'c1_c0' in x, clean_and_flat.columns.values))
-    input_cols = list(filter(lambda x: 'c1_c0' not in x, clean_and_flat.columns.values))
-    print('target_col', target_cols)
-    print('input_cols', input_cols)
-    inputDF = clean_and_flat[input_cols]
-    targetDF = clean_and_flat[target_cols]
+    tmp = P.stack(0).reset_index()
+    print(tmp.head())
+    tmp.index = tmp.apply(lambda x:x['Date']+x['level_1'], axis=1)
+    inputDF = tmp.dropna(axis=1)
+    inputDF.drop(['Date', 'level_1'], axis=1, inplace=True)
+    print(inputDF.head())
+    targetDF = inputDF.apply(lambda x: np.percentile(x, 80), axis=1)
+    print(targetDF.head())
 
-    TotalReturn = ((1 - np.exp(targetDF)).sum(axis=1)) / len(targetDF.columns)  # If i put one dollar in each stock at the close, this is how much I'd get back
+    return inputDF, targetDF
 
-    Labeled = pd.DataFrame()
-    Labeled['return'] = TotalReturn
-    Labeled['class'] = TotalReturn.apply(labeler, 1)
-    Labeled['multi_class'] = pd.qcut(TotalReturn, 11, labels=range(11))
-    pd.qcut(TotalReturn, 5).unique()
 
-    return inputDF, Labeled[str]
-    '''
-    return a
 
 def labeler(x):
     if x>0.0029:
@@ -91,11 +75,8 @@ def labeler(x):
         return 0
 
 
-
+'''
 if __name__ == "__main__":
     all = merge_all_data(datapath)
-    ans = embed(all)
-    print(type(ans))
-    print(ans.head())
-
-
+    a, b = embed(all)
+'''
