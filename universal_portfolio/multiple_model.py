@@ -113,12 +113,12 @@ def baseline_nn(n, X, y):
 
 
 
-def evaluate_baselineNN(input, labels):
+def evaluate_baselineNN(input, labels, gs):
     test_size=600
-    print(classification_report(labels['multi_class'][-test_size:], res.predict(input[-test_size:])))
-    print(confusion_matrix(labels['multi_class'][-test_size:], res.predict(input[-test_size:])))
+    print(classification_report(labels['multi_class'][-test_size:], gs.predict(input[-test_size:])))
+    print(confusion_matrix(labels['multi_class'][-test_size:], gs.predict(input[-test_size:])))
 
-    labels['predicted_action'] = list(map(lambda x: -1 if x < 5 else 0 if x == 5 else 1, res.predict(input)))
+    labels['predicted_action'] = list(map(lambda x: -1 if x < 5 else 0 if x == 5 else 1, gs.predict(input)))
     print(confusion_matrix(labels['class'][-test_size:], labels['predicted_action'][-test_size:]))
 
     labels['pred_return'] = labels['predicted_action'] * labels['return']
@@ -173,28 +173,12 @@ class DNNModel():
 
 
 if __name__ == '__main__':
-    # for MIMIC in continuous space
     datapath = 'util/stock_dfs/'
     all = process_data.merge_all_data(datapath)
-    inputdf, targetdf = process_data.embed(all)
-    labeled = process_data.process_target(targetdf)
+    inputdf, labeled = process_data.embed(all)
 
-    domain = [(0, 1)] * len(inputdf)
-    m = mimic.Mimic(domain, sum, samples=500)
-    for i in range(25):
-        print(np.average([sum(sample) for sample in m.fit()[:5]]))
-        m.fit()
-    results = m.fit()
-    print(results)
-
-    '''
     # for neural network in sklearn
-    datapath = 'util/stock_dfs/'
-    all = process_data.merge_all_data(datapath)
-    inputdf, targetdf = process_data.embed(all)
-    labeled = process_data.process_target(targetdf)
-
-    clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
+    #clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
 
 
     
@@ -274,4 +258,3 @@ if __name__ == '__main__':
                 else:
                     final_probs = np.concatenate((final_probs, probs), axis=0)
             prediction_conf = final_probs[np.argmax(final_probs, 1)]
-'''
