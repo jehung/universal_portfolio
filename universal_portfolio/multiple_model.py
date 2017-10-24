@@ -25,7 +25,7 @@ import sklearn.metrics as metrics
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import make_scorer, accuracy_score, classification_report, confusion_matrix
-from util import process_data
+from util import process_data_choice
 import tensorflow as tf
 from tensorflow.contrib.learn.python.learn.estimators.dnn  import DNNClassifier
 from tensorflow.contrib.layers import real_valued_column
@@ -174,8 +174,8 @@ class DNNModel():
 
 if __name__ == '__main__':
     datapath = 'util/stock_dfs/'
-    all = process_data.merge_all_data(datapath)
-    inputdf, labeled = process_data.embed(all)
+    all = process_data_choice.merge_all_data(datapath)
+    inputdf, labeled = process_data_choice.embed(all)
 
     # for neural network in sklearn
     #clf, score, gs = baseline_nn(len(inputdf.columns), inputdf, labeled['multi_class'])
@@ -183,18 +183,17 @@ if __name__ == '__main__':
 
     
     # for baseline dnn in tensorflow
-    labeled['tf_class'] = labeled['multi_class']
     num_features = len(inputdf.columns)
     dropout = 0.2
     hidden_1_size = 1000
     hidden_2_size = 250
-    num_classes = labeled.tf_class.nunique()
+    num_classes = labeled.nunique()
     NUM_EPOCHS = 100
     BATCH_SIZE = 50
     lr = 0.0001
     test_size=600
-    train = (inputdf[:-test_size].values, labeled.tf_class[:-test_size].values)
-    val = (inputdf[-test_size:].values, labeled.tf_class[-test_size:].values)
+    train = (inputdf[:-test_size].values, labeled[:-test_size].values)
+    val = (inputdf[-test_size:].values, labeled[-test_size:].values)
     NUM_TRAIN_BATCHES = int(len(train[0]) / BATCH_SIZE)
     NUM_VAL_BATCHES = int(len(val[1]) / BATCH_SIZE)
 
