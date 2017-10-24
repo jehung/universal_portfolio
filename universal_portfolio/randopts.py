@@ -53,7 +53,7 @@ INPUT_LAYER = 2232
 HIDDEN_LAYER1 = 1000
 HIDDEN_LAYER2 = 250
 OUTPUT_LAYER = 1
-TRAINING_ITERATIONS = 2000
+TRAINING_ITERATIONS = 21
 OUTFILE = 'Results/randopts_LOG.txt'
 
 
@@ -81,25 +81,29 @@ def errorOnDataSet(network,ds,measure):
     error = 0.
     correct = 0
     incorrect = 0
-    cumret = 1
-    cumact = 1
+    cumret = 0
+    cumact = 0
+    i = 0
     for instance in ds:
+        i += 1
         network.setInputValues(instance.getData())
         network.run()
+        actual = instance.getLabel().getContinuous()
+        predicted = network.getOutputValues().get(0)
+        predicted = max(min(predicted, 1), 0)
+        if predicted >= actual:
+            correct += 1
+        else:
+            incorrect += 1
         output = instance.getLabel()
         output_values = network.getOutputValues()
         example = Instance(output_values, Instance(output_values.get(0)))
         error += measure.value(output, example)
-        cumact *= output.getContinuous()
-        cumret *= output_values.get(0)
-        #if output_values.get(0) >= output.getContinuous():
-        #    correct += 1
-        #else:
-        #    incorrect += 1
-    #acc = correct/float(correct+incorrect)
+        cumret += predicted
+        cumact += actual
+    acc = correct/float(correct+incorrect)
 
-
-    return error
+    return acc, error, cumact, cumret
 
 
 def train(oa, network, oaName, training_ints,testing_ints, measure):
@@ -107,19 +111,20 @@ def train(oa, network, oaName, training_ints,testing_ints, measure):
     """
     print("\nError results for %s\n---------------------------" % (oaName,))
     times = [0]
-    for iteration in range(TRAINING_ITERATIONS):
-        start = time.clock()
-        oa.train()
-        elapsed = time.clock()-start
-        times.append(times[-1]+elapsed)
-        if iteration % 10 == 0:
-            #MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
-            #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
-            acc_trg, cumret_trg, cumact_trg = errorOnDataSet(network, training_ints, measure)
-            acc_tst, cumret_tst, cumact_tst = errorOnDataSet(network,testing_ints,measure)
-            txt = '{},{},{},{}\n'.format(oaName, iteration,error, times[-1]);print(txt)
-            with open(OUTFILE,'a+') as f:
-                f.write(txt)
+    for trial in range(5):
+        for iteration in range(TRAINING_ITERATIONS):
+            start = time.clock()
+            oa.train()
+            elapsed = time.clock()-start
+            times.append(times[-1]+elapsed)
+            if iteration % 10 == 1:
+                #MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
+                #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
+                acc_trg, error_trg, cumact_trg, cumret_trg = errorOnDataSet(network, training_ints, measure)
+                acc_tst, error_tst, cumact_tst, cumret_tst = errorOnDataSet(network,testing_ints,measure)
+                txt = '{},{},{},{},{},{},{}\n'.format(oaName, iteration,acc_trg, error_trg, cumact_trg, cumret_trg,times[-1]);print(txt)
+                with open(OUTFILE,'a+') as f:
+                    f.write(txt)
 
 def main():
     """Run this experiment"""
@@ -140,12 +145,12 @@ def main():
     #rule = RPROPUpdateRule()
     classification_network = factory.createRegressionNetwork([len(inputdf.columns), HIDDEN_LAYER1, HIDDEN_LAYER2, OUTPUT_LAYER],activate)
     nnop = NeuralNetworkOptimizationProblem(data_set, classification_network, measure)
-    rhc = RandomizedHillClimbing(nnop)
-    #sa = SimulatedAnnealing(1E10, .95, nnop)
+    #rhc = RandomizedHillClimbing(nnop)
+    sa = SimulatedAnnealing(1E12, 0.95, nnop)
     #ga = StandardGeneticAlgorithm(100, 20, 10, nnop)
     with open(OUTFILE, 'w') as f:
-        f.write('{},{},{},{}\n'.format('RHC', 'iteration', 'error','elapsed'))
-    train(rhc, classification_network, 'RHC', training_ints,testing_ints, measure)
+        f.write('{},{},{},{},{},{},{}\n'.format('RHC', 'iteration', 'acc_trg','error_trg','cumact_trg', 'cumret_trg','elapsed'))
+    train(sa, classification_network, 'SA', training_ints,testing_ints, measure)
     
     #with open(OUTFILE, 'w') as f:
     #    f.write('{},{},{},{},{},{},{}\n'.format('SA', 'iteration', 'MSE_trg', 'MSE_tst', 'acc_trg', 'acc_tst', 'elapsed'))
