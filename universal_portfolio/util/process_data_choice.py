@@ -59,8 +59,8 @@ def embed(df):
     inputDF = tmp.dropna(axis=1)
     inputDF.drop(['Date', 'level_1'], axis=1, inplace=True)
     print(inputDF.head())
-    targetDF = inputDF.mean(axis=1)
-    targetDF = targetDF.apply(lambda x:labeler(x))
+    targetDF = inputDF.apply(lambda x: np.percentile(x, 50), axis=1)
+    #targetDF = targetDF.apply(lambda x:labeler(x))  ## convert to classification problem
     print(targetDF.head())
 
     return inputDF, targetDF
@@ -68,10 +68,12 @@ def embed(df):
 
 
 def labeler(x):
-    if x>0.0:
-        return 1
-    else:
+    if x>0.0029:
+        return 2
+    if x<-0.00462:
         return 0
+    else:
+        return 1
 
 
 '''
