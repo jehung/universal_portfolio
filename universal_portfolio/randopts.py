@@ -82,8 +82,8 @@ def errorOnDataSet(network,ds,measure):
         network.run()
         actual = instance.getLabel().getContinuous()
         predicted = network.getOutputValues().get(0)
-        predicted = max(min(predicted,1),0)
-        if abs(predicted - actual) < 0.5:
+        #predicted = max(min(predicted,1),0) -- remove to make a regression problem
+        if predicted >= actual: #if abs(predicted - actual) < 0.02:
             correct += 1
         else:
             incorrect += 1
