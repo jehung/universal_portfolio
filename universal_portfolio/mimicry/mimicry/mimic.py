@@ -48,12 +48,13 @@ class Mimic(object):
         )
         return self.sample_set.get_percentile(self.percentile)
 
+
     def _generate_initial_samples(self):
-        return [self._generate_initial_sample() for i in xrange(self.samples)]
+        return [self._generate_initial_sample() for i in range(self.samples)]
 
     def _generate_initial_sample(self):
         return [random.randint(self.domain[i][0], self.domain[i][1])
-                for i in xrange(len(self.domain))]
+                for i in range(len(self.domain))]
 
 
 class SampleSet(object):
@@ -87,23 +88,22 @@ class Distribution(object):
         root = 0
         sample_len = len(self.bayes_net.node)
         samples = np.zeros((number_to_generate, sample_len))
-        values = self.bayes_net.node[root]["probabilities"].keys()
-        probabilities = self.bayes_net.node[root]["probabilities"].values()
+        values = list(self.bayes_net.node[root]["probabilities"].keys())
+        probabilities = list(self.bayes_net.node[root]["probabilities"].values())
         dist = stats.rv_discrete(name="dist", values=(values, probabilities))
         samples[:, 0] = dist.rvs(size=number_to_generate)
         for parent, current in nx.bfs_edges(self.bayes_net, root):
-            for i in xrange(number_to_generate):
+            for i in range(number_to_generate):
                 parent_val = samples[i, parent]
                 current_node = self.bayes_net.node[current]
                 cond_dist = current_node["probabilities"][int(parent_val)]
-                values = cond_dist.keys()
-                probabilities = cond_dist.values()
+                values = list(cond_dist.keys())
+                probabilities = list(cond_dist.values())
                 dist = stats.rv_discrete(
                     name="dist",
                     values=(values, probabilities)
                 )
                 samples[i, current] = dist.rvs()
-
         return samples
 
     def _generate_bayes_net(self):
