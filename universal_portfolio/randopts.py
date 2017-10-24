@@ -32,6 +32,7 @@ jp.java.opt.example.NeuralNetworkOptimizationProblem
 jp.java.opt.RandomizedHillClimbing
 jp.java.ga.StandardGeneticAlgorithm
 jp.java.func.nn.activation.RELU
+jp.java.func.nn.activation.HyperbolicTangentSigmoid
 
 
 BackPropagationNetworkFactory = jp.JPackage('func').nn.backprop.BackPropagationNetworkFactory
@@ -43,6 +44,7 @@ SimulatedAnnealing = jp.JPackage('opt').SimulatedAnnealing
 StandardGeneticAlgorithm = jp.JPackage('opt').ga.StandardGeneticAlgorithm
 Instance = jp.JPackage('shared').Instance
 RELU = jp.JPackage('func').nn.activation.RELU
+HyperbolicTangentSigmoid = jp.JPackage('func').nn.activation.HyperbolicTangentSigmoid
 
 
 INPUT_LAYER = 2232
@@ -77,23 +79,24 @@ def errorOnDataSet(network,ds,measure):
     error = 0.
     correct = 0
     incorrect = 0
+    cumret = 1
+    cumact = 1
     for instance in ds:
         network.setInputValues(instance.getData())
         network.run()
-        actual = instance.getLabel().getContinuous()
-        predicted = network.getOutputValues().get(0)
-        #predicted = max(min(predicted,1),0) -- remove to make a regression problem
-        if predicted >= actual: #if abs(predicted - actual) < 0.02:
-            correct += 1
-        else:
-            incorrect += 1
         output = instance.getLabel()
         output_values = network.getOutputValues()
         example = Instance(output_values, Instance(output_values.get(0)))
         error += measure.value(output, example)
-    MSE = error/float(N)
+        cumact *= output.getContinuous()
+        cumret *= output_values.get(0)
+        if output_values.get(0) >= output.getContinuous():
+            correct += 1
+        else:
+            incorrect += 1
     acc = correct/float(correct+incorrect)
-    return MSE,acc
+
+    return acc, cumret, cumact
 
 
 def train(oa, network, oaName, training_ints,testing_ints, measure):
@@ -107,9 +110,11 @@ def train(oa, network, oaName, training_ints,testing_ints, measure):
         elapsed = time.clock()-start
         times.append(times[-1]+elapsed)
         if iteration % 10 == 0:
-            MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
-            MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
-            txt = '{},{},{},{},{},{},{}\n'.format(oaName, iteration,MSE_trg,MSE_tst,acc_trg,acc_tst,times[-1]);print(txt)
+            #MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
+            #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
+            acc_trg, cumret_trg, cumact_trg = errorOnDataSet(network, training_ints, measure)
+            acc_tst, cumret_tst, cumact_tst = errorOnDataSet(network,testing_ints,measure)
+            txt = '{},{},{},{},{},{},{},{},{}\n'.format(oaName, iteration,acc_trg,acc_tst,cumret_trg,cumret_tst,cumact_trg, cumact_tst, times[-1]);print(txt)
             with open(OUTFILE,'a+') as f:
                 f.write(txt)
 
@@ -127,14 +132,15 @@ def main():
     measure = SumOfSquaresError()
     data_set = DataSet(training_ints)
     relu = RELU()
+    activate = HyperbolicTangentSigmoid()
     #rule = RPROPUpdateRule()
-    classification_network = factory.createRegressionNetwork([len(inputdf.columns), HIDDEN_LAYER1, HIDDEN_LAYER2, OUTPUT_LAYER],relu)
+    classification_network = factory.createRegressionNetwork([len(inputdf.columns), HIDDEN_LAYER1, HIDDEN_LAYER2, OUTPUT_LAYER],activate)
     nnop = NeuralNetworkOptimizationProblem(data_set, classification_network, measure)
     rhc = RandomizedHillClimbing(nnop)
     #sa = SimulatedAnnealing(1E10, .95, nnop)
     #ga = StandardGeneticAlgorithm(100, 20, 10, nnop)
     with open(OUTFILE, 'w') as f:
-        f.write('{},{},{},{},{},{},{}\n'.format('RHC', 'iteration', 'MSE_trg', 'MSE_tst', 'acc_trg', 'acc_tst', 'elapsed'))
+        f.write('{},{},{},{},{},{},{},{},{}\n'.format('RHC', 'iteration', 'acc_trg', 'acc_tst', 'cumret_trg', 'cumret_tst', 'cumact_trg', 'cumact_tst','elapsed'))
     train(rhc, classification_network, 'RHC', training_ints,testing_ints, measure)
     
     #with open(OUTFILE, 'w') as f:
