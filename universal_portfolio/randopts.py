@@ -33,6 +33,7 @@ jp.java.opt.RandomizedHillClimbing
 jp.java.ga.StandardGeneticAlgorithm
 jp.java.func.nn.activation.RELU
 jp.java.func.nn.activation.HyperbolicTangentSigmoid
+jp.java.func.nn.activation.LinearActivationFunction
 
 
 BackPropagationNetworkFactory = jp.JPackage('func').nn.backprop.BackPropagationNetworkFactory
@@ -45,6 +46,7 @@ StandardGeneticAlgorithm = jp.JPackage('opt').ga.StandardGeneticAlgorithm
 Instance = jp.JPackage('shared').Instance
 RELU = jp.JPackage('func').nn.activation.RELU
 HyperbolicTangentSigmoid = jp.JPackage('func').nn.activation.HyperbolicTangentSigmoid
+LinearActivationFunction = jp.JPackage('func').nn.activation.LinearActivationFunction
 
 
 INPUT_LAYER = 2232
@@ -90,13 +92,14 @@ def errorOnDataSet(network,ds,measure):
         error += measure.value(output, example)
         cumact *= output.getContinuous()
         cumret *= output_values.get(0)
-        if output_values.get(0) >= output.getContinuous():
-            correct += 1
-        else:
-            incorrect += 1
-    acc = correct/float(correct+incorrect)
+        #if output_values.get(0) >= output.getContinuous():
+        #    correct += 1
+        #else:
+        #    incorrect += 1
+    #acc = correct/float(correct+incorrect)
 
-    return acc, cumret, cumact
+
+    return error
 
 
 def train(oa, network, oaName, training_ints,testing_ints, measure):
@@ -114,7 +117,7 @@ def train(oa, network, oaName, training_ints,testing_ints, measure):
             #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
             acc_trg, cumret_trg, cumact_trg = errorOnDataSet(network, training_ints, measure)
             acc_tst, cumret_tst, cumact_tst = errorOnDataSet(network,testing_ints,measure)
-            txt = '{},{},{},{},{},{},{},{},{}\n'.format(oaName, iteration,acc_trg,acc_tst,cumret_trg,cumret_tst,cumact_trg, cumact_tst, times[-1]);print(txt)
+            txt = '{},{},{},{}\n'.format(oaName, iteration,error, times[-1]);print(txt)
             with open(OUTFILE,'a+') as f:
                 f.write(txt)
 
@@ -133,6 +136,7 @@ def main():
     data_set = DataSet(training_ints)
     relu = RELU()
     activate = HyperbolicTangentSigmoid()
+    linear_activate = LinearActivationFunction()
     #rule = RPROPUpdateRule()
     classification_network = factory.createRegressionNetwork([len(inputdf.columns), HIDDEN_LAYER1, HIDDEN_LAYER2, OUTPUT_LAYER],activate)
     nnop = NeuralNetworkOptimizationProblem(data_set, classification_network, measure)
@@ -140,7 +144,7 @@ def main():
     #sa = SimulatedAnnealing(1E10, .95, nnop)
     #ga = StandardGeneticAlgorithm(100, 20, 10, nnop)
     with open(OUTFILE, 'w') as f:
-        f.write('{},{},{},{},{},{},{},{},{}\n'.format('RHC', 'iteration', 'acc_trg', 'acc_tst', 'cumret_trg', 'cumret_tst', 'cumact_trg', 'cumact_tst','elapsed'))
+        f.write('{},{},{},{}\n'.format('RHC', 'iteration', 'error','elapsed'))
     train(rhc, classification_network, 'RHC', training_ints,testing_ints, measure)
     
     #with open(OUTFILE, 'w') as f:
