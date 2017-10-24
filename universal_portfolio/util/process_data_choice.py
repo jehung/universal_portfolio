@@ -54,7 +54,6 @@ def embed(df):
     pivot_columns = df.columns[:-1]
     P = df.pivot_table(index=df.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
     tmp = P.stack(0).reset_index()
-    print(tmp.head())
     tmp.index = tmp.apply(lambda x:x['Date']+x['level_1'], axis=1)
     inputDF = tmp.dropna(axis=1)
     inputDF.drop(['Date', 'level_1'], axis=1, inplace=True)
@@ -76,8 +75,8 @@ def labeler(x):
         return 1
 
 
-'''
+
 if __name__ == "__main__":
     all = merge_all_data(datapath)
     a, b = embed(all)
-'''
+
