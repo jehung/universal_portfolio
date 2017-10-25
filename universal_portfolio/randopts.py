@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from util import process_data_choice
+from util import process_data
 #jp.startJVM(jp.getDefaultJVMPath(), "-ea")
 
 jp.startJVM(jp.getDefaultJVMPath(), '-ea', '-Djava.class.path=/Users/jennyhung/MathfreakData/School/OMSCS_ML/Assign2/abagail_py/ABAGAIL/ABAGAIL.jar')
@@ -53,7 +53,7 @@ INPUT_LAYER = 2232
 HIDDEN_LAYER1 = 1000
 HIDDEN_LAYER2 = 250
 OUTPUT_LAYER = 1
-TRAINING_ITERATIONS = 21
+TRAINING_ITERATIONS = 1
 OUTFILE = 'Results/randopts_LOG.txt'
 
 
@@ -81,29 +81,28 @@ def errorOnDataSet(network,ds,measure):
     error = 0.
     correct = 0
     incorrect = 0
-    cumret = 0
-    cumact = 0
-    i = 0
+    #cumret = 0
+    #cumact = 0
+    diff = 0
     for instance in ds:
-        i += 1
         network.setInputValues(instance.getData())
         network.run()
-        actual = instance.getLabel().getContinuous()
-        predicted = network.getOutputValues().get(0)
-        predicted = max(min(predicted, 1), 0)
-        if predicted >= actual:
-            correct += 1
-        else:
-            incorrect += 1
+        #actual = instance.getLabel().getContinuous()
+        #predicted = network.getOutputValues().dotProduct(network.getWeights())
+        #diff += predicted - actual
+        #if abs(predicted - actual) <= 0.01:
+        #    correct += 1
+        #else:
+        #    incorrect += 1
         output = instance.getLabel()
         output_values = network.getOutputValues()
         example = Instance(output_values, Instance(output_values.get(0)))
         error += measure.value(output, example)
-        cumret += predicted
-        cumact += actual
-    acc = correct/float(correct+incorrect)
+        #cumret += predicted
+        #cumact += actual
+    #acc = correct/float(correct+incorrect)
 
-    return acc, error, cumact, cumret
+    return error
 
 
 def train(oa, network, oaName, training_ints,testing_ints, measure):
@@ -111,27 +110,26 @@ def train(oa, network, oaName, training_ints,testing_ints, measure):
     """
     print("\nError results for %s\n---------------------------" % (oaName,))
     times = [0]
-    for trial in range(5):
-        for iteration in range(TRAINING_ITERATIONS):
-            start = time.clock()
-            oa.train()
-            elapsed = time.clock()-start
-            times.append(times[-1]+elapsed)
-            if iteration % 10 == 1:
-                #MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
-                #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
-                acc_trg, error_trg, cumact_trg, cumret_trg = errorOnDataSet(network, training_ints, measure)
-                acc_tst, error_tst, cumact_tst, cumret_tst = errorOnDataSet(network,testing_ints,measure)
-                txt = '{},{},{},{},{},{},{}\n'.format(oaName, iteration,acc_trg, error_trg, cumact_trg, cumret_trg,times[-1]);print(txt)
-                with open(OUTFILE,'a+') as f:
-                    f.write(txt)
+    for iteration in range(TRAINING_ITERATIONS):
+        start = time.clock()
+        oa.train()
+        elapsed = time.clock()-start
+        times.append(times[-1]+elapsed)
+        if iteration % 10 == 1:
+            #MSE_trg, acc_trg = errorOnDataSet(network,training_ints,measure)
+            #MSE_tst, acc_tst = errorOnDataSet(network,testing_ints,measure)
+            error_trg = errorOnDataSet(network, training_ints, measure)
+            error_tst = errorOnDataSet(network,testing_ints,measure)
+            txt = '{},{},{},{}\n'.format(oaName, iteration,error_trg, times[-1]);print(txt)
+            with open(OUTFILE,'a+') as f:
+                f.write(txt)
 
 def main():
     """Run this experiment"""
     datapath = 'util/stock_dfs/'
     test_size=600
-    all = process_data_choice.merge_all_data(datapath)
-    inputdf, labeled = process_data_choice.embed(all)
+    all = process_data.merge_all_data(datapath)
+    inputdf, labeled = process_data.embed(all, 'return')
     train_inputdf, val_inputdf, train_labeled, val_labeled = get_cv_set(inputdf.values, labeled)
 
     training_ints = initialize_instances(train_inputdf, train_labeled)
@@ -149,8 +147,10 @@ def main():
     sa = SimulatedAnnealing(1E12, 0.95, nnop)
     #ga = StandardGeneticAlgorithm(100, 20, 10, nnop)
     with open(OUTFILE, 'w') as f:
-        f.write('{},{},{},{},{},{},{}\n'.format('RHC', 'iteration', 'acc_trg','error_trg','cumact_trg', 'cumret_trg','elapsed'))
+        f.write('{},{},{},{}\n'.format('SA', 'iteration','error_trg','elapsed'))
     train(sa, classification_network, 'SA', training_ints,testing_ints, measure)
+    #print(classification_network.getWeights())
+    print(classification_network.getWeights().get(0))
     
     #with open(OUTFILE, 'w') as f:
     #    f.write('{},{},{},{},{},{},{}\n'.format('SA', 'iteration', 'MSE_trg', 'MSE_tst', 'acc_trg', 'acc_tst', 'elapsed'))
