@@ -149,8 +149,7 @@ def main():
     with open(OUTFILE, 'w') as f:
         f.write('{},{},{},{}\n'.format('SA', 'iteration','error_trg','elapsed'))
     train(sa, classification_network, 'SA', training_ints,testing_ints, measure)
-    #print(classification_network.getWeights())
-    print(classification_network.getWeights().get(0))
+    print(classification_network.getWeights())
     
     #with open(OUTFILE, 'w') as f:
     #    f.write('{},{},{},{},{},{},{}\n'.format('SA', 'iteration', 'MSE_trg', 'MSE_tst', 'acc_trg', 'acc_tst', 'elapsed'))
