@@ -26,10 +26,10 @@ def make_inputs(filepath):
     Res = pd.DataFrame()
     ticker = get_ticker(filepath)
 
-    #Res['c_2_o'] = get_zscore(ret(D.Open,D.Close))
+    Res['c_2_o'] = get_zscore(ret(D.Open,D.Close))
     Res['h_2_o'] = get_zscore(ret(D.Open,D.High))
     Res['l_2_o'] = get_zscore(ret(D.Open,D.Low))
-    #Res['c_2_h'] = get_zscore(ret(D.High,D.Close))
+    Res['c_2_h'] = get_zscore(ret(D.High,D.Close))
     Res['h_2_l'] = get_zscore(ret(D.High,D.Low))
     Res['c1_c0'] = ret(D.Close,D.Close.shift(-1)).fillna(0) #Tommorows return
     Res['vol'] = get_zscore(D.Volume)
@@ -56,13 +56,9 @@ def embed(df, str):
     mi = P.columns.tolist()
     new_ind = pd.Index(e[1] + '_' + e[0] for e in mi)
     P.columns = new_ind
-    print(P.columns)
     clean_and_flat = P.dropna(axis=1)
-    print(clean_and_flat.head())
     target_cols = list(filter(lambda x: 'c1_c0' in x, clean_and_flat.columns.values))
     input_cols = list(filter(lambda x: 'c1_c0' not in x, clean_and_flat.columns.values))
-    print('target_col', target_cols)
-    print('input_cols', input_cols)
     inputDF = clean_and_flat[input_cols]
     targetDF = clean_and_flat[target_cols]
 
