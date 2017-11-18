@@ -53,51 +53,37 @@ def read_file(file):
     d = pd.read_csv(file).set_index('Date')
     d.fillna(0, inplace=True)
     ticker = get_ticker(file)
+    d['ticker'] = ticker
+    d.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Adj Close': 'adj_close', 'Volume (BTC)': 'volume'},
+                  inplace=True)
 
-    df = pd.DataFrame(scaler.fit_transform(d), columns=d.columns)
-    df['ticker'] = ticker
-    pivot = df.pivot_table(index=d.index, columns='ticker', values=d.columns)  # Make a pivot table from the data
+    return d, ticker
+
+
+# Initialize first state, all items are placed deterministically
+def init_state(file, test=False):
+    d, ticker = read_file(file)
+    xdata=pd.DataFrame()
+    scaler = preprocessing.StandardScaler()
+    xdata['close'] = d['close']#.values
+    xdata['diff'] = xdata['close'].diff(periods=1)
+    xdata['diff'].fillna(0, inplace=True)
+    xdata['sma15'] = SMA(d, timeperiod=15)
+    xdata['sma60'] = SMA(d, timeperiod=60)
+    xdata['rsi'] = RSI(d, timeperiod=14)
+    xdata['atr'] = ATR(d, timeperiod=14)
+    xdata.fillna(0, inplace=True)
+
+    # --- Preprocess data
+    #xdata = np.column_stack((close, diff, sma15, close - sma15, sma15 - sma60, rsi, atr))
+    xdata = pd.DataFrame(scaler.fit_transform(xdata), columns=xdata.columns)
+    xdata['ticker'] = ticker
+    pivot_columns = xdata.columns[0:-1]
+
+    pivot = xdata.pivot_table(index=d.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
     return pivot
 
-
-def process_data(test=False):
-    filepath = '../util/stock_dfs/'
-    all = []
-    for f in os.listdir(filepath):
-        datapath = os.path.join(filepath, f)
-        if datapath.endswith('.csv'):
-            # print(datapath)
-            Res = read_file(datapath)
-            all.append(Res)
-    all = pd.concat(all, axis=1)
-    all.fillna(0, inplace=True)
-
-    # all.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Adj Close': 'adj_close', 'Volume (BTC)': 'volume'},
-    #              inplace=True)
-    x_train = all.iloc[-2000:-30, ]
-    x_test = all.iloc[-2000:, ]
-    if test:
-        return x_test
-    else:
-        return x_train
-
-    return all
-
-
-
-#Initialize first state, all items are placed deterministically
-def init_state(indata, test=False):
-    close = indata['close'].values
-    diff = np.diff(close)
-    diff = np.insert(diff, 0, 0)
-    sma15 = SMA(indata, timeperiod=15)
-    sma60 = SMA(indata, timeperiod=60)
-    rsi = RSI(indata, timeperiod=14)
-    atr = ATR(indata, timeperiod=14)
-
-    #--- Preprocess data
-    xdata = np.column_stack((close, diff, sma15, close-sma15, sma15-sma60, rsi, atr))
-    
+    '''
     xdata = np.nan_to_num(xdata)
     if test == False:
         scaler = preprocessing.StandardScaler()
@@ -109,6 +95,31 @@ def init_state(indata, test=False):
     state = xdata[0:1, 0:1, :]
 
     return state, xdata, close
+    '''
+    return xdata
+
+def all_init_data(test=False):
+    filepath = 'util/stock_dfs/'
+    all = []
+    for f in os.listdir(filepath):
+        datapath = os.path.join(filepath, f)
+        if datapath.endswith('.csv'):
+            # print(datapath)
+            Res = init_state(datapath)
+            all.append(Res)
+    all = pd.concat(all, axis=1)
+    all.fillna(0, inplace=True)
+
+    x_train = all.iloc[-2000:-30, ]
+    x_test = all.iloc[-2000:, ]
+    if test:
+        return x_test
+    else:
+        return x_train
+
+    return all
+
+
 
 
 '''
@@ -351,7 +362,6 @@ if __name__ == "__main__":
     plt.show()
 '''
 
-all = process_data()
-print(all)
-print(all.shape)
-print(type(all))
+xdata = all_init_data()
+print(xdata)
+#print(all)
