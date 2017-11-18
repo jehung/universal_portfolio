@@ -48,7 +48,7 @@ def get_ticker(x):
     return x.split('/')[-1].split('.')[0]
 
 
-def read_file(file):
+def read_file(file, test=False):
     scaler = preprocessing.MinMaxScaler()
     d = pd.read_csv(file).set_index('Date')
     d.fillna(0, inplace=True)
@@ -57,11 +57,16 @@ def read_file(file):
     d.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Adj Close': 'adj_close', 'Volume (BTC)': 'volume'},
                   inplace=True)
 
-    return d, ticker
+    x_train = d.iloc[:-31, ]
+    x_test = d.iloc[-30:, ]
+    if test:
+        return x_test, ticker
+    else:
+        return x_train, ticker
 
 
 # Initialize first state, all items are placed deterministically
-def init_state(file, test=False):
+def init_state(file):
     d, ticker = read_file(file)
     xdata=pd.DataFrame()
     scaler = preprocessing.StandardScaler()
@@ -81,26 +86,15 @@ def init_state(file, test=False):
     pivot_columns = xdata.columns[0:-1]
 
     pivot = xdata.pivot_table(index=d.index, columns='ticker', values=pivot_columns)  # Make a pivot table from the data
+    pivot.columns = [s1 + '-' + s2 for (s1, s2) in pivot.columns.tolist()]
+
     return pivot
 
-    '''
-    xdata = np.nan_to_num(xdata)
-    if test == False:
-        scaler = preprocessing.StandardScaler()
-        xdata = np.expand_dims(scaler.fit_transform(xdata), axis=1)
-        joblib.dump(scaler, 'scaler.pkl')
-    elif test == True:
-        scaler = joblib.load('scaler.pkl')
-        xdata = np.expand_dims(scaler.fit_transform(xdata), axis=1)
-    state = xdata[0:1, 0:1, :]
-
-    return state, xdata, close
-    '''
-    return xdata
 
 def all_init_data(test=False):
     filepath = 'util/stock_dfs/'
     all = []
+    scaler = preprocessing.StandardScaler()
     for f in os.listdir(filepath):
         datapath = os.path.join(filepath, f)
         if datapath.endswith('.csv'):
@@ -109,15 +103,20 @@ def all_init_data(test=False):
             all.append(Res)
     all = pd.concat(all, axis=1)
     all.fillna(0, inplace=True)
+    print('here')
+    print(all)
+    closecol = [col for col in all.columns if 'close' in col]
+    close = all[closecol].values
 
-    x_train = all.iloc[-2000:-30, ]
-    x_test = all.iloc[-2000:, ]
-    if test:
-        return x_test
-    else:
-        return x_train
+    if test == False:
+        all = np.expand_dims(all, axis=1)
+        joblib.dump(scaler, 'scaler.pkl')
+    elif test == True:
+        scaler = joblib.load('scaler.pkl')
+        all = np.expand_dims(all, axis=1)
+    state = all[0:1, 0:1, :]
 
-    return all
+    return state, all, close
 
 
 
@@ -362,6 +361,4 @@ if __name__ == "__main__":
     plt.show()
 '''
 
-xdata = all_init_data()
-print(xdata)
-#print(all)
+state, all, close = all_init_data()
