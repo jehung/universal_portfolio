@@ -157,45 +157,35 @@ def take_action(state, xdata, action, signal, time_step):
 # Get Reward, the reward is returned at the end of an episode
 def get_reward(new_state, time_step, action, xdata, signal, terminal_state, eval=False, epoch=0):
     reward = 0
+    reward_dict={}
     signal.fillna(value=0, inplace=True)
 
     if eval == False:
-        try:
-            bt = twp.Backtest(pd.Series(data=[x[0] for x in xdata[time_step - 2:time_step]], index=signal[time_step - 2:time_step].index.values),
-                          signal[time_step - 2:time_step], signalType='shares')
-            reward = np.max((bt.data['price'].iloc[-1] - bt.data['price'].iloc[-2]) * bt.data['shares'].iloc[-1])
-        except:
-            pass
-    if terminal_state == 1 and eval == True:
-        bt = twp.Backtest(pd.Series(data=[x[0] for x in xdata], index=signal.index.values), signal, signalType='shares')
-        reward = bt.pnl.iloc[-1]
-        plt.figure(figsize=(9, 16))
-        bt.plotTrades()
-        plt.axvline(x=400, color='black', linestyle='--')
-        plt.text(250, 400, 'training data')
-        plt.text(450, 400, 'test data')
-        plt.suptitle(str(epoch))
-        plt.savefig('plt/' + 'knapsack_' + str(epoch) + '.png')
-        plt.close('all')
+        for j in range(xdata.shape[1]):
+            bt = twp.Backtest(pd.Series(data=[x[j] for x in xdata[time_step - 2:time_step]], index=signal[time_step - 2:time_step].index.values),
+                              signal[time_step - 2:time_step], signalType='shares')
+            reward = (bt.data['price'].iloc[-1] - bt.data['price'].iloc[-2]) * bt.data['shares'].iloc[-1]
 
-        '''
-        # save a figure of the test set
-        plt.figure(figsize=(10, 25))
-        for i in range(xdata.T.shape[0]):
-        #frame = pd.concat(btFrame, axis=1)
-            bt = twp.Backtest(pd.Series(data=[x for x in xdata.T[i]], index=signal.index.values), signal, signalType='shares')
-            reward += np.max(bt.pnl.iloc[-1])
-            bt.plotTrades()
-        #plt.axvline(x=400, color='black', linestyle='--')
-        #plt.text(250, 400, 'training data')
-        #plt.text(450, 400, 'test data')
-        #plt.suptitle(str(epoch))
-        plt.savefig('plt/' + 'knapsack_' + str(epoch) + '.png', bbox_inches='tight', pad_inches=1, dpi=72)
-        plt.close('all')
-        '''
+    if terminal_state == 1 and eval == True:
+        for j in range(xdata.shape[1]):
+            try:
+                bt = twp.Backtest(pd.Series(data=[x[j] for x in xdata], index=signal.index.values), signal, signalType='shares')
+                reward = bt.pnl.iloc[-1]
+                reward_dict[i]=reward
+                plt.figure(figsize=(9, 16))
+                bt.plotTrades()
+                plt.axvline(x=xdata.shape[0]-100, color='black', linestyle='--')
+                plt.text(250, 400, 'training data')
+                plt.text(450, 400, 'test data')
+                plt.suptitle(str(epoch))
+                plt.savefig('plt/' + 'knapsack_' + str(j)+ ' '+ str(epoch) + '.png')
+                plt.close('all')
+            except:
+                pass
+
     # print(time_step, terminal_state, eval, reward)
 
-    return reward
+    return reward_dict
 
 
 def evaluate_Q(eval_data, eval_model, epoch=0):
@@ -226,7 +216,7 @@ if __name__ == "__main__":
     # model.predict(state.reshape(1,64), batch_size=1)
     batch_size = 7
     num_features = 2544
-    epochs = 3
+    epochs = 10
     gamma = 0.95  # since the reward can be several time steps away, make gamma high
     epsilon = 1
     batchSize = 100
@@ -323,9 +313,9 @@ if __name__ == "__main__":
                     y = np.zeros((1, 4))
                     y[:] = old_qval[:]
                     if terminal_state == 0:  # non-terminal state
-                        update = (reward + (gamma * maxQ))
+                        update = (sum(list(reward.values())) + (gamma * maxQ))
                     else:  # terminal state
-                        update = reward
+                        update = sum(list(reward.values()))
                     # print('rewardbase', reward)
 
                     # print('update', update)
@@ -336,7 +326,7 @@ if __name__ == "__main__":
 
                 X_train = np.squeeze(np.array(X_train), axis=(1))
                 y_train = np.array(y_train)
-                model.fit(X_train, y_train, batch_size=batchSize, epochs=100, verbose=0)
+                model.fit(X_train, y_train, batch_size=batchSize, epochs=500, verbose=0)
 
                 state = new_state
             if terminal_state == 1:  # if reached terminal state, update epoch status
@@ -344,9 +334,11 @@ if __name__ == "__main__":
 
 
         eval_reward = evaluate_Q(test_data, model, i)
-        # eval_reward = value_iter(test_data, epsilon, epochs)
-        learning_progress.append(eval_reward)
-        print("Epoch #: %s Reward: %f Epsilon: %f" % (i, eval_reward, epsilon))
+        #learning_progress.append(eval_reward)
+        reward_df = pd.DataFrame.from_dict(eval_reward, orient='index').reset_index()
+        reward_df.to_csv('reward_results.csv')
+
+        print("Epoch #: %s Reward: %f Epsilon: %f" % (i, sum(list(eval_reward.values())), epsilon))
         # learning_progress.append((reward))
         if epsilon > 0.1:  # decrement epsilon over time
             epsilon -= (1.0 / epochs)
@@ -355,14 +347,19 @@ if __name__ == "__main__":
     elapsed = np.round(timeit.default_timer() - start_time, decimals=2)
     print("Completed in %f" % (elapsed,))
 
-    bt = twp.Backtest(pd.Series(data=[x[0] for x in test_price_data]), signal, signalType='shares')
-    bt.data['delta'] = bt.data['shares'].diff().fillna(0)
+    resutls = []
+    for i in range(test_price_data.shape[1]):
+        bt = twp.Backtest(pd.Series(data=[x[0] for x in test_price_data]), signal, signalType='shares')
+        bt.data['delta'] = bt.data['shares'].diff().fillna(0)
+        bt.data['nth_feature'] = i
+        results.appebd(bt.data)
 
-
-    print(bt.data)
-    bt.data.to_csv('plt/knapsack_data.csv')
+    results = pd.concat(results, axis=1)
+    print(results)
+    results.to_csv('plt/knapsack_all_resutls.csv')
+    '''
     unique, counts = np.unique(filter(lambda v: v == v, signal.values), return_counts=True)
-    print(np.asarray((unique, counts)).T)
+    sprint(np.asarray((unique, counts)).T)
 
     plt.figure()
     plt.subplot(3, 1, 1)
@@ -373,7 +370,7 @@ if __name__ == "__main__":
     plt.plot(learning_progress)
     print('to plot', learning_progress)
 
-    plt.savefig('plt/knapsack_summary' + '.png', bbox_inches='tight', pad_inches=1, dpi=72)
+    plt.savefig('plt/q_summary' + '.png', bbox_inches='tight', pad_inches=1, dpi=72)
     plt.show()
-
+    '''
 
