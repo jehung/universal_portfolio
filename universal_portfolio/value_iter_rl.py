@@ -230,7 +230,7 @@ if __name__ == "__main__":
     # model.predict(state.reshape(1,64), batch_size=1)
     batch_size = 7
     num_features = 7
-    epochs = 10
+    epochs = 3
     gamma = 0.95  # since the reward can be several time steps away, make gamma high
     epsilon = 1
     batchSize = 100
@@ -325,7 +325,7 @@ if __name__ == "__main__":
 
                 X_train = np.squeeze(np.array(X_train), axis=(1))
                 y_train = np.array(y_train)
-                model.fit(X_train, y_train, batch_size=batchSize, nb_epoch=1, verbose=0)
+                model.fit(X_train, y_train, batch_size=batchSize, epochs=100, verbose=0)
 
                 state = new_state
             if terminal_state == 1:  # if reached terminal state, update epoch status
