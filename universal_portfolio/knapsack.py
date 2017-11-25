@@ -169,7 +169,7 @@ def get_reward(new_state, time_step, action, xdata, signal, terminal_state, eval
     if terminal_state == 1 and eval == True:
         bt = twp.Backtest(pd.Series(data=[x[0] for x in xdata], index=signal.index.values), signal, signalType='shares')
         reward = bt.pnl.iloc[-1]
-        plt.figure(figsize=(3, 4))
+        plt.figure(figsize=(9, 16))
         bt.plotTrades()
         plt.axvline(x=400, color='black', linestyle='--')
         plt.text(250, 400, 'training data')
@@ -247,7 +247,7 @@ if __name__ == "__main__":
                    stateful=False))
     model.add(Dropout(0.5))
 
-    model.add(Dense(3, init='lecun_uniform'))
+    model.add(Dense(4, init='lecun_uniform'))
     model.add(Activation('linear'))  # linear output so we can have range of real-valued outputs
 
     rms = RMSprop()
@@ -289,7 +289,7 @@ if __name__ == "__main__":
             print('epoch ' + str(i))
             qval = model.predict(state, batch_size=batch_size)
             if (random.random() < epsilon):  # choose random action
-                action = np.random.randint(0, 3)  # assumes 4 different actions
+                action = np.random.randint(0, 4)  # assumes 4 different actions
             else:  # choose best action from Q(s,a) values
                 action = (np.argmax(qval))
             # Take action, observe new state S'
@@ -320,7 +320,7 @@ if __name__ == "__main__":
                     old_qval = model.predict(old_state, batch_size=batch_size)
                     newQ = model.predict(new_state, batch_size=batch_size)
                     maxQ = np.max(newQ)
-                    y = np.zeros((1, 3))
+                    y = np.zeros((1, 4))
                     y[:] = old_qval[:]
                     if terminal_state == 0:  # non-terminal state
                         update = (reward + (gamma * maxQ))
@@ -332,11 +332,11 @@ if __name__ == "__main__":
                     y[0][action] = update
                     # print(time_step, reward, terminal_state)
                     X_train.append(old_state)
-                    y_train.append(y.reshape(3, ))
+                    y_train.append(y.reshape(4, ))
 
                 X_train = np.squeeze(np.array(X_train), axis=(1))
                 y_train = np.array(y_train)
-                model.fit(X_train, y_train, batch_size=batchSize, nb_epoch=1, verbose=0)
+                model.fit(X_train, y_train, batch_size=batchSize, epochs=500, verbose=0)
 
                 state = new_state
             if terminal_state == 1:  # if reached terminal state, update epoch status
