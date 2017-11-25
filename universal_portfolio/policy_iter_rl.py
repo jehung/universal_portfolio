@@ -149,7 +149,7 @@ def get_reward(new_state, time_step, action, xdata, signal, terminal_state, eval
 
         plt.figure(figsize=(3, 4))
         bt.plotTrades()
-        plt.axvline(x=400, color='black', linestyle='--')
+        plt.axvline(x=xdata.shape[0]-300, color='black', linestyle='--')
         plt.text(250, 400, 'training data')
         plt.text(450, 400, 'test data')
         plt.suptitle(str(epoch))
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     # model.predict(state.reshape(1,64), batch_size=1)
     batch_size = 7
     num_features = 7
-    epochs = 50
+    epochs = 3
     gamma = 0.95  # since the reward can be several time steps away, make gamma high
     epsilon = 1
     batchSize = 100
@@ -308,11 +308,12 @@ if __name__ == "__main__":
                     old_state, action, reward, new_state = memory
                     old_qval = model.predict(old_state, batch_size=batch_size)
                     newQ = model.predict(new_state, batch_size=batch_size)
-                    maxQ = newQ[0][np.random.randint(0, 3)]
+                    #maxQ = newQ[0][np.random.randint(0, 3)]
+                    maxQ = np.argmax(newQ)
                     y = np.zeros((1, 3))
                     y[:] = old_qval[:]
                     if terminal_state == 0:  # non-terminal state
-                        update = reward + (gamma * np.max(new_state * maxQ))
+                        update = reward + (gamma * (np.max(new_state) * maxQ))
                     else:  # terminal state
                         update = reward
                     # print('rewardbase', reward)
@@ -323,7 +324,7 @@ if __name__ == "__main__":
 
                 X_train = np.squeeze(np.array(X_train), axis=(1))
                 y_train = np.array(y_train)
-                model.fit(X_train, y_train, batch_size=batchSize, nb_epoch=1, verbose=0)
+                model.fit(X_train, y_train, batch_size=batchSize, epochs=100, verbose=0)
 
                 state = new_state
             if terminal_state == 1:  # if reached terminal state, update epoch status
