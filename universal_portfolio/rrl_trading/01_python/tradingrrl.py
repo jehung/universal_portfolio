@@ -8,7 +8,6 @@ from datetime import datetime as dt
 import matplotlib.pyplot as plt
 
 
-
 class TradingRRL(object):
     def __init__(self, T=1000, M=200, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10000):
         self.T = T
@@ -22,11 +21,11 @@ class TradingRRL(object):
         self.t = None
         self.p = None
         self.r = None
-        self.x = np.zeros([T, M+2])
-        self.F = np.zeros(T+1)
+        self.x = np.zeros([T, M + 2])
+        self.F = np.zeros(T + 1)
         self.R = np.zeros(T)
-        self.w = np.ones(M+2)
-        self.w_opt = np.ones(M+2)
+        self.w = np.ones(M + 2)
+        self.w_opt = np.ones(M + 2)
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
         self.progress_period = 100
@@ -35,13 +34,15 @@ class TradingRRL(object):
     def load_csv(self, fname):
         tmp = pd.read_csv(fname, header=0, low_memory=False)
         print(tmp.head())
-        #tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
-        tmp_tstr = tmp['Date']
+        print(tmp.shape)
+        # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
+        tmp_tstr = tmp['Unnamed: 0']
         tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
-        tmp_p = list(tmp['Adj Close'])
-        self.all_t = np.array(tmp_t[::-1])
-        self.all_p = np.array(tmp_p[::-1])
-        print('shape', self.all_p.shape)
+        tmp_p = tmp.iloc[:, 1:]
+        print(tmp_p)
+        self.all_t = np.array(tmp_t)
+        self.all_p = np.array(tmp_p).reshape((1, -1))[0]
+        print('shape', self.all_p)
 
     def quant(self, f):
         fc = f.copy()
@@ -49,60 +50,60 @@ class TradingRRL(object):
         return np.sign(fc)
 
     def set_t_p_r(self):
-        self.t = self.all_t[self.init_t:self.init_t+self.T+self.M+1]
-        self.p = self.all_p[self.init_t:self.init_t+self.T+self.M+1]
+        self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
+        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1]
         self.r = -np.diff(self.p)
 
-
     def set_x_F(self):
-        for i in range(self.T-1, -1 ,-1):
-            self.x[i] = np.zeros(self.M+2)
+        for i in range(self.T - 1, -1, -1):
+            self.x[i] = np.zeros(self.M + 2)
             self.x[i][0] = 1.0
-            self.x[i][self.M+2-1] = self.F[i+1]
-            for j in range(1, self.M+2-1, 1):
-                self.x[i][j] = self.r[i+j-1]
+            self.x[i][self.M + 2 - 1] = self.F[i + 1]
+            for j in range(1, self.M + 2 - 1, 1):
+                self.x[i][j] = self.r[i + j - 1]
             self.F[i] = np.tanh(np.dot(self.w, self.x[i]))
 
     def calc_R(self):
         self.R = self.mu * (self.F[1:] * self.r[:self.T] - self.sigma * np.abs(-np.diff(self.F)))
 
     def calc_sumR(self):
-        self.sumR  = np.cumsum(self.R[::-1])[::-1]
-        self.sumR2  = np.cumsum((self.R**2)[::-1])[::-1]
+        self.sumR = np.cumsum(self.R[::-1])[::-1]
+        self.sumR2 = np.cumsum((self.R ** 2)[::-1])[::-1]
 
     def calc_dSdw(self):
         self.set_x_F()
         self.calc_R()
         self.calc_sumR()
-        self.A      =  self.sumR[0] / self.T
-        self.B      =  self.sumR2[0] / self.T
-        self.S      =  self.A / np.sqrt(self.B - self.A**2)
-        self.dSdA   =  self.S * (1 + self.S**2) / self.A
-        self.dSdB   = -self.S**3 / 2 / self.A**2
-        self.dAdR   =  1.0 / self.T
-        self.dBdR   =  2.0 / self.T * self.R
-        self.dRdF   = -self.mu * self.sigma * np.sign(-np.diff(self.F))
-        self.dRdFp  =  self.mu * self.r[:self.T] + self.mu * self.sigma * np.sign(-np.diff(self.F))
-        self.dFdw   = np.zeros(self.M+2)
-        self.dFpdw  = np.zeros(self.M+2)
-        self.dSdw   = np.zeros(self.M+2)
-        for i in range(self.T-1, -1 ,-1):
-            if i != self.T-1:
+        self.A = self.sumR[0] / self.T
+        self.B = self.sumR2[0] / self.T
+        self.S = self.A / np.sqrt(self.B - self.A ** 2)
+        self.dSdA = self.S * (1 + self.S ** 2) / self.A
+        self.dSdB = -self.S ** 3 / 2 / self.A ** 2
+        self.dAdR = 1.0 / self.T
+        self.dBdR = 2.0 / self.T * self.R
+        self.dRdF = -self.mu * self.sigma * np.sign(-np.diff(self.F))
+        self.dRdFp = self.mu * self.r[:self.T] + self.mu * self.sigma * np.sign(-np.diff(self.F))
+        self.dFdw = np.zeros(self.M + 2)
+        self.dFpdw = np.zeros(self.M + 2)
+        self.dSdw = np.zeros(self.M + 2)
+        for i in range(self.T - 1, -1, -1):
+            if i != self.T - 1:
                 self.dFpdw = self.dFdw.copy()
-            self.dFdw  = (1 - self.F[i]**2) * (self.x[i] + self.w[self.M+2-1] * self.dFpdw)
-            self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[i]) * (self.dRdF[i] * self.dFdw + self.dRdFp[i] * self.dFpdw)
+            self.dFdw = (1 - self.F[i] ** 2) * (self.x[i] + self.w[self.M + 2 - 1] * self.dFpdw)
+            self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[i]) * (
+            self.dRdF[i] * self.dFdw + self.dRdFp[i] * self.dFpdw)
 
     def update_w(self):
         self.w += self.rho * self.dSdw
 
     def fit(self):
-        
+
         pre_epoch_times = len(self.epoch_S)
 
         self.calc_dSdw()
         print("Epoch loop start. Initial sharp's ratio is " + str(self.S) + ".")
         self.S_opt = self.S
-        
+
         tic = time.clock()
         for e_index in range(self.n_epoch):
             self.calc_dSdw()
@@ -111,11 +112,15 @@ class TradingRRL(object):
                 self.w_opt = self.w.copy()
             self.epoch_S = np.append(self.epoch_S, self.S)
             self.update_w()
-            if e_index % self.progress_period  == self.progress_period-1:
+            if e_index % self.progress_period == self.progress_period - 1:
                 toc = time.clock()
-                print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(self.n_epoch + pre_epoch_times) +". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(toc-tic) + " sec.")
+                print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
+                    self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(
+                    toc - tic) + " sec.")
         toc = time.clock()
-        print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(self.n_epoch + pre_epoch_times) +". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(toc-tic) + " sec.")
+        print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
+            self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(
+            toc - tic) + " sec.")
         self.w = self.w_opt.copy()
         self.calc_dSdw()
         print("Epoch loop end. Optimized sharp's ratio is " + str(self.S_opt) + ".")
@@ -124,7 +129,7 @@ class TradingRRL(object):
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
         pd.DataFrame(self.epoch_S).to_csv("epoch_S.csv", header=False, index=False)
         pd.DataFrame(self.F).to_csv("f.csv", header=False, index=False)
-        
+
     def load_weight(self):
         tmp = pd.read_csv("w.csv", header=None)
         self.w = tmp.T.values[0]
@@ -146,6 +151,7 @@ def read_file(file, test=None):
 
     return d
 
+
 def all_init_data():
     filepath = '../../util/stock_dfs/'
     alldata = []
@@ -161,7 +167,6 @@ def all_init_data():
     alldata.to_csv('all_data.csv')
 
 
-
 def plot_hist(n_tick, R):
     rnge = max(R) - min(R)
     tick = rnge / n_tick
@@ -169,21 +174,24 @@ def plot_hist(n_tick, R):
     tick_max = [min(R) + tick * 0.5 + i * tick for i in range(n_tick)]
     tick_center = [min(R) + i * tick for i in range(n_tick)]
     tick_val = [0.0] * n_tick
-    for i in range(n_tick ):
-        tick_val[i] = len(set(np.where(tick_min[i] < np.array(R))[0].tolist()).intersection(np.where(np.array(R) <= tick_max[i])[0]))
+    for i in range(n_tick):
+        tick_val[i] = len(
+            set(np.where(tick_min[i] < np.array(R))[0].tolist()).intersection(np.where(np.array(R) <= tick_max[i])[0]))
     plt.bar(tick_center, tick_val, width=tick)
     plt.grid()
     plt.show()
 
+
 def main():
-    fname = '../../util/stock_dfs/A.csv'
-    #fname = 'USDJPY30.csv'
-    #all_init_data()
+    #fname = '../../util/stock_dfs/A.csv'
+    # fname = 'USDJPY30.csv'
+    fname = 'all_data.csv'
+    # all_init_data()
 
     init_t = 1001
 
     T = 1000
-    M = 200
+    M = 1000
     mu = 1000
     sigma = 0.03
     rho = 1.0
@@ -195,7 +203,7 @@ def main():
     ini_rrl.set_t_p_r()
     ini_rrl.calc_dSdw()
     # RRL agent for training
-    rrl = TradingRRL(T, M, init_t,  mu, sigma, rho, n_epoch)
+    rrl = TradingRRL(T, M, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
@@ -204,7 +212,7 @@ def main():
 
     # Plot results.
     # Training for initial term T.
-    plt.plot(range(len(rrl.epoch_S)),rrl.epoch_S)
+    plt.plot(range(len(rrl.epoch_S)), rrl.epoch_S)
     plt.title("Sharp's ratio optimization")
     plt.xlabel("Epoch times")
     plt.ylabel("Sharp's ratio")
@@ -235,16 +243,15 @@ def main():
     plt.savefig("rrl_train.png", dpi=300)
     fig.clear()
 
-
     # Prediction for next term T with optimized weight.
     # RRL agent with initial weight.
-    ini_rrl_f = TradingRRL(T, M, init_t-T, mu, sigma, rho, n_epoch)
+    ini_rrl_f = TradingRRL(T, M, init_t - T, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
     ini_rrl_f.set_t_p_r()
     ini_rrl_f.calc_dSdw()
     # RRL agent with optimized weight.
-    rrl_f = TradingRRL(T, M, init_t-T, mu, sigma, rho, n_epoch)
+    rrl_f = TradingRRL(T, M, init_t - T, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
     rrl_f.set_t_p_r()
@@ -252,7 +259,7 @@ def main():
     rrl_f.calc_dSdw()
 
     fig, ax = plt.subplots(nrows=3, figsize=(15, 10))
-    t_f = np.linspace(rrl.T+1, rrl.T+rrl.T, rrl.T)[::-1]
+    t_f = np.linspace(rrl.T + 1, rrl.T + rrl.T, rrl.T)[::-1]
     ax[0].plot(t_f, rrl_f.p[:rrl_f.T])
     ax[0].set_xlabel("time")
     ax[0].set_ylabel("USDJPY")
@@ -273,8 +280,6 @@ def main():
     ax[2].grid(True)
     plt.savefig("rrl_prediction.png", dpi=300)
     fig.clear()
-
-
 
 
 if __name__ == "__main__":
