@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class TradingRRL(object):
-    def __init__(self, T=1000, M=200, N=424, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10000):
+    def __init__(self, T=1000, M=300, N=424, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10000):
         self.T = T
         self.M = M
         self.N = N
@@ -56,6 +56,23 @@ class TradingRRL(object):
         self.r = -np.diff(self.p)
 
     def set_x_F(self):
+        tmp = np.zeros([self.T, self.M + 2])
+
+        for i in range(self.T - 1, -1, -1):
+            tmp[i] = np.zeros(self.M + 2)
+            tmp[i][0] = 1.0
+            tmp[i][self.M + 2 - 1] = self.F[i + 1,-1]
+            for j in range(1, self.M + 2 - 1, 1):
+                tmp[i][j] = self.r[i + j - 1]
+
+        print('filling 3d array of x')
+        for i in range(self.N - 1, -1, -1):
+            self.x[i] = tmp
+
+        self.F = np.tanh(np.dot(self.x, self.w))
+        print('f dimension', self.F.shape)
+        print('x dimension', self.x.shape)
+        '''
         for i in range(self.N - 1, -1, -1):
             for j in range(self.T - 1, -1, -1):
                 self.x[i][j] = np.zeros(self.M + 2)
@@ -65,21 +82,15 @@ class TradingRRL(object):
                     self.x[i][j][k] = self.r[j + k - 1]
                 self.F[j,1:] = np.tanh(np.dot(self.x[i], self.w))
         '''
-        for i in range(self.T - 1, -1, -1):
-            self.x[i] = np.zeros(self.M + 2)
-            self.x[i][0] = 1.0
-            self.x[i][self.M + 2 - 1] = self.F[i + 1]
-            for j in range(1, self.M + 2 - 1, 1):
-                self.x[i][j] = self.r[i + j - 1]
-            self.F[i] = np.tanh(np.dot(self.w, self.x[i]))
-        '''
     def calc_R(self):
-        self.R = self.mu * (self.F[1:,:] * self.r[:self.T,:] - self.sigma * np.abs(-np.diff(self.F)))
+        #self.R = self.mu * (self.F[1:,:] * self.r[:self.T,:] - self.sigma * np.abs(-np.diff(self.F)))
+        self.R = self.mu * (self.F[1:, :] * self.r[:self.T] - self.sigma * np.abs(-np.diff(self.F, axis=0)))
+        print('r dimension', self.R.shape)
 
     def calc_sumR(self):
-        self.sumR = np.cumsum(self.R[::-1,:])[::-1]
+        self.sumR = np.cumsum(self.R)
         self.sumR2 = np.cumsum((self.R ** 2)[::-1,:])[::-1]
-        print('sumr', self.np.cumsum(self.R[::-1,:]))
+        print('sumr', self.sumR.shape)
 
 
     def calc_dSdw(self):
@@ -87,24 +98,26 @@ class TradingRRL(object):
         print('i am here')
         self.calc_R()
         self.calc_sumR()
-        self.A = self.sumR[0] / self.T
-        self.B = self.sumR2[0] / self.T
-        self.S = self.A / np.sqrt(self.B - self.A ** 2)
-        self.dSdA = self.S * (1 + self.S ** 2) / self.A
-        self.dSdB = -self.S ** 3 / 2 / self.A ** 2
-        self.dAdR = 1.0 / self.T
-        self.dBdR = 2.0 / self.T * self.R
-        self.dRdF = -self.mu * self.sigma * np.sign(-np.diff(self.F))
-        self.dRdFp = self.mu * self.r[:self.T] + self.mu * self.sigma * np.sign(-np.diff(self.F))
-        self.dFdw = np.zeros(self.M + 2)
-        self.dFpdw = np.zeros(self.M + 2)
-        self.dSdw = np.zeros(self.M + 2)
-        for i in range(self.T - 1, -1, -1):
-            if i != self.T - 1:
-                self.dFpdw = self.dFdw.copy()
-            self.dFdw = (1 - self.F[i] ** 2) * (self.x[i] + self.w[self.M + 2 - 1] * self.dFpdw)
-            self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[i]) * (
-            self.dRdF[i] * self.dFdw + self.dRdFp[i] * self.dFpdw)
+
+        for i in range(self.R.shape[0]):
+            self.A = np.sum(self.sumR[i]) / self.T
+            self.B = np.sum(self.sumR2[i]) / self.T
+            self.S = self.A / np.sqrt(self.B - self.A ** 2)
+            self.dSdA = self.S * (1 + self.S ** 2) / self.A
+            self.dSdB = -self.S ** 3 / 2 / self.A ** 2
+            self.dAdR = 1.0 / self.T
+            self.dBdR = 2.0 / self.T * self.R[i]
+            self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=0)))
+            self.dRdFp = self.mu * self.r[i] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=0))
+            self.dFdw = np.zeros(self.M + 2)
+            self.dFpdw = np.zeros(self.M + 2)
+            self.dSdw = np.zeros(self.M + 2)
+            for j in range(self.T - 1, -1, -1):
+                if j != self.T - 1:
+                    self.dFpdw = self.dFdw.copy()
+                self.dFdw = (1 - self.F[i,j] ** 2) * (self.x[i][j] + self.w[self.M + 2 - 1] * self.dFpdw)
+                self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (
+                self.dRdF[i][j] * self.dFdw + self.dRdFp[i][j] * self.dFpdw)
 
     def update_w(self):
         self.w += self.rho * self.dSdw
@@ -204,7 +217,7 @@ def main():
     init_t = 1001
 
     T = 1000
-    M = 1000
+    M = 300
     N = 424
     mu = 1000
     sigma = 0.03
@@ -212,14 +225,14 @@ def main():
     n_epoch = 10000
 
     # RRL agent with initial weight.
-    ini_rrl = TradingRRL(T, M, init_t, mu, sigma, rho, n_epoch)
+    ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     ini_rrl.load_csv(fname)
     ini_rrl.set_t_p_r()
     print('starting derivative calc')
     ini_rrl.calc_dSdw()
     print('finished 1')
     # RRL agent for training
-    rrl = TradingRRL(T, M, init_t, mu, sigma, rho, n_epoch)
+    rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
@@ -262,13 +275,13 @@ def main():
 
     # Prediction for next term T with optimized weight.
     # RRL agent with initial weight.
-    ini_rrl_f = TradingRRL(T, M, init_t - T, mu, sigma, rho, n_epoch)
+    ini_rrl_f = TradingRRL(T, M, N, init_t - T, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
     ini_rrl_f.set_t_p_r()
     ini_rrl_f.calc_dSdw()
     # RRL agent with optimized weight.
-    rrl_f = TradingRRL(T, M, init_t - T, mu, sigma, rho, n_epoch)
+    rrl_f = TradingRRL(T, M, N, init_t - T, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
     rrl_f.set_t_p_r()
