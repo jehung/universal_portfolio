@@ -18,6 +18,7 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
 from keras.layers.recurrent import LSTM
 from keras.optimizers import RMSprop, Adam
+from collections import defaultdict
 
 '''
 Name:        The Self Learning Quant, Example 3
@@ -155,33 +156,30 @@ def take_action(state, xdata, action, signal, time_step):
 
 
 # Get Reward, the reward is returned at the end of an episode
-def get_reward(new_state, time_step, action, xdata, signal, terminal_state, eval=False, epoch=0):
+def get_reward(new_state, time_step, action, xdata, signal, terminal_state, reward_dict, eval=False, epoch=0):
     reward = 0
-    reward_dict={}
     signal.fillna(value=0, inplace=True)
-
     if eval == False:
         for j in range(xdata.shape[1]):
             bt = twp.Backtest(pd.Series(data=[x[j] for x in xdata[time_step - 2:time_step]], index=signal[time_step - 2:time_step].index.values),
                               signal[time_step - 2:time_step], signalType='shares')
             reward = (bt.data['price'].iloc[-1] - bt.data['price'].iloc[-2]) * bt.data['shares'].iloc[-1]
+            reward_dict[j].append(reward)
 
     if terminal_state == 1 and eval == True:
         for j in range(xdata.shape[1]):
-            try:
-                bt = twp.Backtest(pd.Series(data=[x[j] for x in xdata], index=signal.index.values), signal, signalType='shares')
-                reward = bt.pnl.iloc[-1]
-                reward_dict[i]=reward
-                plt.figure(figsize=(9, 16))
-                bt.plotTrades()
-                plt.axvline(x=xdata.shape[0]-100, color='black', linestyle='--')
-                plt.text(250, 400, 'training data')
-                plt.text(450, 400, 'test data')
-                plt.suptitle(str(epoch))
-                plt.savefig('plt/' + 'knapsack_' + str(j)+ ' '+ str(epoch) + '.png')
-                plt.close('all')
-            except:
-                pass
+            bt = twp.Backtest(pd.Series(data=[x[j] for x in xdata], index=signal.index.values), signal, signalType='shares')
+            reward = bt.pnl.iloc[-1]
+            reward_dict[j].append(reward)
+            plt.figure(figsize=(9, 16))
+            bt.plotTrades()
+            plt.axvline(x=xdata.shape[0]-100, color='black', linestyle='--')
+            plt.text(250, 400, 'training data')
+            plt.text(450, 400, 'test data')
+            plt.suptitle(str(epoch))
+            plt.savefig('plt/' + 'knapsack_' + str(j)+ ' '+ str(epoch) + '.png')
+            plt.close('all')
+        print('@ eval=TRUE')
 
     # print(time_step, terminal_state, eval, reward)
 
@@ -202,7 +200,7 @@ def evaluate_Q(eval_data, eval_model, epoch=0):
         # Take action, observe new state S'
         new_state, time_step, signal, terminal_state = take_action(state, xdata, action, signal, time_step)
         # Observe reward
-        eval_reward = get_reward(new_state, time_step, action, price_data, signal, terminal_state, eval=True,
+        eval_reward = get_reward(new_state, time_step, action, price_data, signal, terminal_state, reward_dict, eval=True,
                                  epoch=epoch)
         state = new_state
         if terminal_state == 1:  # terminal state
@@ -216,7 +214,7 @@ if __name__ == "__main__":
     # model.predict(state.reshape(1,64), batch_size=1)
     batch_size = 7
     num_features = 2544
-    epochs = 10
+    epochs = 2
     gamma = 0.95  # since the reward can be several time steps away, make gamma high
     epsilon = 1
     batchSize = 100
@@ -265,6 +263,7 @@ if __name__ == "__main__":
     # signal = pd.Series(index=market_data.index)
     signal = pd.Series(index=np.arange(len(xdata)))
     for i in range(epochs):
+        reward_dict = defaultdict(list)
         if i == epochs - 1:  # the last epoch, use test data set
             state, xdata, price_data = all_init_data()
         else:
@@ -286,7 +285,7 @@ if __name__ == "__main__":
             new_state, time_step, signal, terminal_state = take_action(state, xdata, action, signal, time_step)
             # Observe reward
 
-            reward = get_reward(new_state, time_step, action, price_data, signal, terminal_state)
+            reward = get_reward(new_state, time_step, action, price_data, signal, terminal_state, reward_dict)
             print('new_state', new_state)
             print('reward', reward)
 
@@ -313,9 +312,9 @@ if __name__ == "__main__":
                     y = np.zeros((1, 4))
                     y[:] = old_qval[:]
                     if terminal_state == 0:  # non-terminal state
-                        update = (sum(list(reward.values())) + (gamma * maxQ))
+                        update = max([reward[k][0] for k in sorted(reward.keys())]) + (gamma * maxQ)
                     else:  # terminal state
-                        update = sum(list(reward.values()))
+                        update = max([reward[k][0] for k in sorted(reward.keys())])
                     # print('rewardbase', reward)
 
                     # print('update', update)
@@ -338,7 +337,7 @@ if __name__ == "__main__":
         reward_df = pd.DataFrame.from_dict(eval_reward, orient='index').reset_index()
         reward_df.to_csv('reward_results.csv')
 
-        print("Epoch #: %s Reward: %f Epsilon: %f" % (i, sum(list(eval_reward.values())), epsilon))
+        print("Epoch #: %s Reward: %f Epsilon: %f" % (i, max([reward[k][0] for k in sorted(reward.keys())]), epsilon))
         # learning_progress.append((reward))
         if epsilon > 0.1:  # decrement epsilon over time
             epsilon -= (1.0 / epochs)
