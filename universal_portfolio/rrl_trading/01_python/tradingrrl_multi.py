@@ -22,11 +22,11 @@ class TradingRRL(object):
         self.t = None
         self.p = None
         self.r = None
-        self.x = np.zeros([N, T, M + 2])
+        self.x = np.zeros([T, M + 2])
         self.F = np.zeros((T + 1, N))
         self.R = np.zeros((N,T))
-        self.w = np.ones(M + 2)
-        self.w_opt = np.ones(M + 2)
+        self.w = np.ones((M + 2, N))
+        self.w_opt = np.ones((M + 2, N))
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
         self.progress_period = 100
@@ -56,42 +56,28 @@ class TradingRRL(object):
         self.r = -np.diff(self.p)
 
     def set_x_F(self):
-        tmp = np.zeros([self.T, self.M + 2])
-
         for i in range(self.T - 1, -1, -1):
-            tmp[i] = np.zeros(self.M + 2)
-            tmp[i][0] = 1.0
-            tmp[i][self.M + 2 - 1] = self.F[i + 1,-1]
+            self.x[i] = np.zeros(self.M + 2)
+            self.x[i][0] = 1.0
+            print(i)
+            print(self.F.shape)
+            self.x[i][self.M + 2 - 1] = self.F[-1, -1]
             for j in range(1, self.M + 2 - 1, 1):
-                tmp[i][j] = self.r[i + j - 1]
-
-        print('filling 3d array of x')
-        for i in range(self.N - 1, -1, -1):
-            self.x[i] = tmp
-
+                self.x[i][j] = self.r[i + j - 1]
         self.F = np.tanh(np.dot(self.x, self.w))
         print('f dimension', self.F.shape)
         print('x dimension', self.x.shape)
-        '''
-        for i in range(self.N - 1, -1, -1):
-            for j in range(self.T - 1, -1, -1):
-                self.x[i][j] = np.zeros(self.M + 2)
-                self.x[i][j][0] = 1.0
-                self.x[i][j][self.M + 2 - 1] = self.F[j + 1, -1]
-                for k in range(1, self.M + 2 - 1, 1):
-                    self.x[i][j][k] = self.r[j + k - 1]
-                self.F[j,1:] = np.tanh(np.dot(self.x[i], self.w))
-        '''
+
     def calc_R(self):
         #self.R = self.mu * (self.F[1:,:] * self.r[:self.T,:] - self.sigma * np.abs(-np.diff(self.F)))
-        self.R = self.mu * (self.F[1:, :] * self.r[:self.T] - self.sigma * np.abs(-np.diff(self.F, axis=0)))
+        self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
         print('r dimension', self.R.shape)
 
     def calc_sumR(self):
-        self.sumR = np.cumsum(self.R)
-        self.sumR2 = np.cumsum((self.R ** 2)[::-1,:])[::-1]
+        self.sumR = np.cumsum(self.R, axis=1)
+        self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=1)[::-1]
         print('sumr', self.sumR.shape)
-
+        print('sumr2', self.sumR2.shape)
 
     def calc_dSdw(self):
         self.set_x_F()
@@ -99,25 +85,25 @@ class TradingRRL(object):
         self.calc_R()
         self.calc_sumR()
 
-        for i in range(self.R.shape[0]):
-            self.A = np.sum(self.sumR[i]) / self.T
-            self.B = np.sum(self.sumR2[i]) / self.T
+        for i in range(self.N - 2, -1, -1):
+            self.A = np.sum(self.sumR[:,i]) / self.T
+            self.B = np.sum(self.sumR2[:,i]) / self.T
             self.S = self.A / np.sqrt(self.B - self.A ** 2)
             self.dSdA = self.S * (1 + self.S ** 2) / self.A
             self.dSdB = -self.S ** 3 / 2 / self.A ** 2
             self.dAdR = 1.0 / self.T
-            self.dBdR = 2.0 / self.T * self.R[i]
-            self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=0)))
-            self.dRdFp = self.mu * self.r[i] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=0))
+            self.dBdR = 2.0 / self.T * self.R[:,i]
+            self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=1)))
+            self.dRdFp = self.mu * self.r[i] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=1))
             self.dFdw = np.zeros(self.M + 2)
             self.dFpdw = np.zeros(self.M + 2)
             self.dSdw = np.zeros(self.M + 2)
             for j in range(self.T - 1, -1, -1):
                 if j != self.T - 1:
                     self.dFpdw = self.dFdw.copy()
-                self.dFdw = (1 - self.F[i,j] ** 2) * (self.x[i][j] + self.w[self.M + 2 - 1] * self.dFpdw)
-                self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (
-                self.dRdF[i][j] * self.dFdw + self.dRdFp[i][j] * self.dFpdw)
+                self.dFdw = (1 - self.F[j,i] ** 2) * (self.x[j] + self.w[self.M + 2 - 1,i] * self.dFpdw)
+                self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (self.dRdF[j,i] * self.dFdw + self.dRdFp[j,i] * self.dFpdw)
+
 
     def update_w(self):
         self.w += self.rho * self.dSdw
@@ -132,6 +118,7 @@ class TradingRRL(object):
 
         tic = time.clock()
         for e_index in range(self.n_epoch):
+            print('e_index', e_index)
             self.calc_dSdw()
             if self.S > self.S_opt:
                 self.S_opt = self.S
@@ -235,6 +222,8 @@ def main():
     rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
+    print('all_t', rrl.all_t.shape)
+    print('all_p', rrl.all_p.shape)
     rrl.set_t_p_r()
     rrl.fit()
     print('finished 2')
