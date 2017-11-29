@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class TradingRRL(object):
-    def __init__(self, T=1000, M=300, N=424, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10000):
+    def __init__(self, T=1000, M=300, N=424, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10):
         self.T = T
         self.M = M
         self.N = N
@@ -97,13 +97,15 @@ class TradingRRL(object):
             self.dRdFp = self.mu * self.r[i] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=1))
             self.dFdw = np.zeros(self.M + 2)
             self.dFpdw = np.zeros(self.M + 2)
-            self.dSdw = np.zeros(self.M + 2)
+            self.dSdw = np.zeros((self.M + 2, self.N))
+            self.dSdw_j = np.zeros(self.M + 2)
             for j in range(self.T - 1, -1, -1):
                 if j != self.T - 1:
                     self.dFpdw = self.dFdw.copy()
                 self.dFdw = (1 - self.F[j,i] ** 2) * (self.x[j] + self.w[self.M + 2 - 1,i] * self.dFpdw)
-                self.dSdw += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (self.dRdF[j,i] * self.dFdw + self.dRdFp[j,i] * self.dFpdw)
+                self.dSdw_j += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (self.dRdF[j,i] * self.dFdw + self.dRdFp[j,i] * self.dFpdw)
 
+            self.dSdw[:,i] = self.dSdw_j
 
     def update_w(self):
         self.w += self.rho * self.dSdw
