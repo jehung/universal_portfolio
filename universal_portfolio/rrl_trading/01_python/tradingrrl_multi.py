@@ -71,7 +71,7 @@ class TradingRRL(object):
     def calc_R(self):
         #self.R = self.mu * (self.F[1:,:] * self.r[:self.T,:] - self.sigma * np.abs(-np.diff(self.F)))
         self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
-        print('r dimension', self.R.shape)
+        print('r dimension', self.R)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R, axis=1)
@@ -211,7 +211,7 @@ def main():
     mu = 1000
     sigma = 0.03
     rho = 1.0
-    n_epoch = 10000
+    n_epoch = 10
 
     # RRL agent with initial weight.
     ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
@@ -224,8 +224,6 @@ def main():
     rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
-    print('all_t', rrl.all_t.shape)
-    print('all_p', rrl.all_p.shape)
     rrl.set_t_p_r()
     rrl.fit()
     print('finished 2')
