@@ -42,8 +42,8 @@ class TradingRRL(object):
         tmp_p = tmp.iloc[:, 1:]
         print(tmp_p)
         self.all_t = np.array(tmp_t)
-        self.all_p = np.array(tmp_p).reshape((1, -1))[0]
-        print('shape', self.all_p)
+        self.all_p = np.array(tmp_p)#.reshape((1, -1))[0]
+        print('all_p', self.all_p)
 
     def quant(self, f):
         fc = f.copy()
@@ -52,8 +52,12 @@ class TradingRRL(object):
 
     def set_t_p_r(self):
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
-        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1]
-        self.r = -np.diff(self.p)
+        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,:]
+        self.r = -np.diff(self.p, axis=0)
+        print('all_t', self.all_t.shape)
+        print('all_p', self.all_p.shape)
+        print('p', self.p.shape)
+        print('r dimension', self.r.shape)
 
     def set_x_F(self):
         for i in range(self.T - 1, -1, -1):
@@ -61,20 +65,21 @@ class TradingRRL(object):
             self.x[i][0] = 1.0
             self.x[i][self.M + 2 - 1] = self.F[-1, -1]
             for j in range(1, self.M + 2 - 1, 1):
-                self.x[i][j] = self.r[i + j - 1]
-        self.F = np.tanh(np.dot(self.x, self.w))
+                self.x[i][j] = self.r[i, j - 1]
+        self.F[0] = np.zeros(self.N)
+        self.F[1:] = np.tanh(np.dot(self.x, self.w))
         print('f dimension', self.F.shape)
         print('x dimension', self.x.shape)
 
     def calc_R(self):
-        self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
-        #self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
-        print('r dimension', self.R.shape)
+        #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
+        self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
+        print('R', self.R)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R, axis=0)
         self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=0)[::-1]
-        print('sumr', self.sumR.shape)
+        print('sumr', self.sumR)
         print('sumr2', self.sumR2.shape)
 
     def calc_dSdw(self):
@@ -83,15 +88,18 @@ class TradingRRL(object):
         self.calc_sumR()
 
         for i in range(self.N - 2, -1, -1):
-            self.A = np.sum(self.sumR[0,i]) / self.T
-            self.B = np.sum(self.sumR2[0,i]) / self.T
+            #self.A = np.sum(self.sumR[:,i]) / self.T
+            #self.B = np.sum(self.sumR2[:,i]) / self.T
+
+            self.A = np.mean(self.R[:,i], axis=0)
+            self.B = np.mean(self.R[:,i]**2, axis=0)
             self.S = self.A / np.sqrt(self.B - self.A ** 2)
             self.dSdA = self.S * (1 + self.S ** 2) / self.A
             self.dSdB = -self.S ** 3 / 2 / self.A ** 2
             self.dAdR = 1.0 / self.T
             self.dBdR = 2.0 / self.T * self.R[:,i]
             self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=1)))
-            self.dRdFp = self.mu * self.r[i] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=1))
+            self.dRdFp = self.mu * self.r[self.M,:-1] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=1))
             self.dFdw = np.zeros(self.M + 2)
             self.dFpdw = np.zeros(self.M + 2)
             self.dSdw = np.zeros((self.M + 2, self.N))
@@ -200,7 +208,7 @@ def main():
     fname = 'all_data.csv'
     # all_init_data()
 
-    init_t = 1001
+    init_t = 50
 
     T = 1000
     M = 300
