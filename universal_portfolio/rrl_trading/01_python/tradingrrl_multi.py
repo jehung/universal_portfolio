@@ -29,7 +29,7 @@ class TradingRRL(object):
         self.w_opt = np.ones((M + 2, N))
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
-        self.progress_period = 100
+        self.progress_period = 2
         self.q_threshold = 0.5
 
     def load_csv(self, fname):
@@ -59,8 +59,6 @@ class TradingRRL(object):
         for i in range(self.T - 1, -1, -1):
             self.x[i] = np.zeros(self.M + 2)
             self.x[i][0] = 1.0
-            print(i)
-            print(self.F.shape)
             self.x[i][self.M + 2 - 1] = self.F[-1, -1]
             for j in range(1, self.M + 2 - 1, 1):
                 self.x[i][j] = self.r[i + j - 1]
@@ -69,25 +67,24 @@ class TradingRRL(object):
         print('x dimension', self.x.shape)
 
     def calc_R(self):
-        #self.R = self.mu * (self.F[1:,:] * self.r[:self.T,:] - self.sigma * np.abs(-np.diff(self.F)))
         self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
-        print('r dimension', self.R)
+        #self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
+        print('r dimension', self.R.shape)
 
     def calc_sumR(self):
-        self.sumR = np.cumsum(self.R, axis=1)
-        self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=1)[::-1]
+        self.sumR = np.cumsum(self.R, axis=0)
+        self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=0)[::-1]
         print('sumr', self.sumR.shape)
         print('sumr2', self.sumR2.shape)
 
     def calc_dSdw(self):
         self.set_x_F()
-        print('i am here')
         self.calc_R()
         self.calc_sumR()
 
         for i in range(self.N - 2, -1, -1):
-            self.A = np.sum(self.sumR[:,i]) / self.T
-            self.B = np.sum(self.sumR2[:,i]) / self.T
+            self.A = np.sum(self.sumR[0,i]) / self.T
+            self.B = np.sum(self.sumR2[0,i]) / self.T
             self.S = self.A / np.sqrt(self.B - self.A ** 2)
             self.dSdA = self.S * (1 + self.S ** 2) / self.A
             self.dSdB = -self.S ** 3 / 2 / self.A ** 2
