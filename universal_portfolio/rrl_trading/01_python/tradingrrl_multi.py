@@ -29,7 +29,7 @@ class TradingRRL(object):
         self.w_opt = np.ones((M + 2, N))
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
-        self.progress_period = 2
+        self.progress_period = 100
         self.q_threshold = 0.5
 
     def load_csv(self, fname):
@@ -74,12 +74,12 @@ class TradingRRL(object):
     def calc_R(self):
         #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
         self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
-        print('R', self.R)
+        print('R', self.R.shape)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R, axis=0)
         self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=0)[::-1]
-        print('sumr', self.sumR)
+        print('sumr', self.sumR.shape)
         print('sumr2', self.sumR2.shape)
 
     def calc_dSdw(self):
@@ -87,15 +87,16 @@ class TradingRRL(object):
         self.calc_R()
         self.calc_sumR()
 
+        self.S = np.array([]) # a list of period-to-date sharpe ratios, for all n investments
         for i in range(self.N - 2, -1, -1):
             #self.A = np.sum(self.sumR[:,i]) / self.T
             #self.B = np.sum(self.sumR2[:,i]) / self.T
 
             self.A = np.mean(self.R[:,i], axis=0)
             self.B = np.mean(self.R[:,i]**2, axis=0)
-            self.S = self.A / np.sqrt(self.B - self.A ** 2)
-            self.dSdA = self.S * (1 + self.S ** 2) / self.A
-            self.dSdB = -self.S ** 3 / 2 / self.A ** 2
+            self.S_i = self.A / np.sqrt(self.B - self.A ** 2)
+            self.dSdA = self.S_i * (1 + self.S_i ** 2) / self.A
+            self.dSdB = -self.S_i ** 3 / 2 / self.A ** 2
             self.dAdR = 1.0 / self.T
             self.dBdR = 2.0 / self.T * self.R[:,i]
             self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=1)))
@@ -111,6 +112,8 @@ class TradingRRL(object):
                 self.dSdw_j += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (self.dRdF[j,i] * self.dFdw + self.dRdFp[j,i] * self.dFpdw)
 
             self.dSdw[:,i] = self.dSdw_j
+            self.S.append(self.S_i)
+
 
     def update_w(self):
         self.w += self.rho * self.dSdw
@@ -120,14 +123,14 @@ class TradingRRL(object):
         pre_epoch_times = len(self.epoch_S)
 
         self.calc_dSdw()
-        print("Epoch loop start. Initial sharp's ratio is " + str(self.S) + ".")
+        print("Epoch loop start. Initial sharp's ratio is " + str(np.max(self.S)) + ".")
         self.S_opt = self.S
 
         tic = time.clock()
         for e_index in range(self.n_epoch):
             print('e_index', e_index)
             self.calc_dSdw()
-            if self.S > self.S_opt:
+            if np.max(self.S) > np.max(self.S_opt):
                 self.S_opt = self.S
                 self.w_opt = self.w.copy()
             self.epoch_S = np.append(self.epoch_S, self.S)
@@ -135,15 +138,15 @@ class TradingRRL(object):
             if e_index % self.progress_period == self.progress_period - 1:
                 toc = time.clock()
                 print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
-                    self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(
+                    self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(np.max(self.S)) + ". Elapsed time: " + str(
                     toc - tic) + " sec.")
         toc = time.clock()
         print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
-            self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.S) + ". Elapsed time: " + str(
+            self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(np.max(self.S)) + ". Elapsed time: " + str(
             toc - tic) + " sec.")
         self.w = self.w_opt.copy()
         self.calc_dSdw()
-        print("Epoch loop end. Optimized sharp's ratio is " + str(self.S_opt) + ".")
+        print("Epoch loop end. Optimized sharp's ratio is " + str(np.max(self.S_opt)) + ".")
 
     def save_weight(self):
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
@@ -208,15 +211,15 @@ def main():
     fname = 'all_data.csv'
     # all_init_data()
 
-    init_t = 50
+    init_t = 1001
 
     T = 1000
-    M = 300
+    M = 60
     N = 424
-    mu = 1000
+    mu = 10000
     sigma = 0.03
     rho = 1.0
-    n_epoch = 10
+    n_epoch = 10000
 
     # RRL agent with initial weight.
     ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
