@@ -65,10 +65,12 @@ class TradingRRL(object):
 
     def calc_R(self):
         self.R = self.mu * (self.F[1:] * self.r[:self.T] - self.sigma * np.abs(-np.diff(self.F)))
+        print((self.sigma * np.abs(-np.diff(self.F))).shape)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R[::-1])[::-1]
         self.sumR2 = np.cumsum((self.R ** 2)[::-1])[::-1]
+        print('sumr', self.sumR.shape)
 
     def calc_dSdw(self):
         self.set_x_F()
@@ -77,6 +79,7 @@ class TradingRRL(object):
         self.A = self.sumR[0] / self.T
         self.B = self.sumR2[0] / self.T
         self.S = self.A / np.sqrt(self.B - self.A ** 2)
+        print('source', self.R)
         self.dSdA = self.S * (1 + self.S ** 2) / self.A
         self.dSdB = -self.S ** 3 / 2 / self.A ** 2
         self.dAdR = 1.0 / self.T
