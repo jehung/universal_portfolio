@@ -75,6 +75,7 @@ class TradingRRL(object):
             for j in range(1, self.M + 2 - 1, 1):
                 self.x[i][j] = self.r[i, j - 1] ## TODO: i used -1 on column
             self.F[i] = np.tanh(np.dot(self.x[i], self.w))
+        print('f dimension', self.F.shape)
 
     def calc_R(self):
         #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
@@ -109,7 +110,7 @@ class TradingRRL(object):
             for i in range(self.T - 1, -1, -1):
                 if i != self.T - 1:
                     self.dFpdw = self.dFdw.copy()
-                self.dFdw = (1 - self.F[i] ** 2) * (self.x[i] + self.w[self.M + 2 - 1] * self.dFpdw)
+                self.dFdw = (1 - self.F[i,j] ** 2) * (self.x[i] + self.w[self.M + 2 - 1,j] * self.dFpdw)
                 self.dSdw_j += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[i]) * (
                     self.dRdF[i,j] * self.dFdw + self.dRdFp[i,j] * self.dFpdw)
             self.dSdw[:, j] = self.dSdw_j
@@ -124,13 +125,13 @@ class TradingRRL(object):
 
         self.calc_dSdw()
         print("Epoch loop start. Initial sharp's ratio is " + str(self.S) + ".")
-        self.S_opt = self.Sall[0]
+        print('s len', len(self.Sall))
+        self.S_opt = self.Sall
 
         tic = time.clock()
-        print('s', self.Sall)
         for e_index in range(self.n_epoch):
             self.calc_dSdw()
-            if self.Sall[0] > self.S_opt:
+            if self.Sall > self.S_opt:
                 self.S_opt = self.Sall
                 self.w_opt = self.w.copy()
             self.epoch_S = np.append(self.epoch_S, self.Sall)
@@ -211,11 +212,11 @@ def main():
     fname = 'all_data.csv'
     # all_init_data()
 
-    init_t = 6000
+    init_t = 1001
 
     T = 1000
     M = 200
-    N = 1
+    N = 424
     mu = 10000
     sigma = 0.04
     rho = 1.0
