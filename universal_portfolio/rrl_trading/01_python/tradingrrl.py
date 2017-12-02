@@ -29,20 +29,16 @@ class TradingRRL(object):
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
         self.progress_period = 100
-        self.q_threshold = 0.5
+        self.q_threshold = 0.7
 
     def load_csv(self, fname):
         tmp = pd.read_csv(fname, header=0, low_memory=False)
-        print(tmp.head())
-        print(tmp.shape)
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
         tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
-        print(tmp_p)
         self.all_t = np.array(tmp_t)
         self.all_p = np.array(tmp_p).reshape((1, -1))[0]
-        print('shape', self.all_p)
 
     def quant(self, f):
         fc = f.copy()
@@ -65,12 +61,10 @@ class TradingRRL(object):
 
     def calc_R(self):
         self.R = self.mu * (self.F[1:] * self.r[:self.T] - self.sigma * np.abs(-np.diff(self.F)))
-        print((self.sigma * np.abs(-np.diff(self.F))).shape)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R[::-1])[::-1]
         self.sumR2 = np.cumsum((self.R ** 2)[::-1])[::-1]
-        print('sumr', self.sumR.shape)
 
     def calc_dSdw(self):
         self.set_x_F()
@@ -79,7 +73,6 @@ class TradingRRL(object):
         self.A = self.sumR[0] / self.T
         self.B = self.sumR2[0] / self.T
         self.S = self.A / np.sqrt(self.B - self.A ** 2)
-        print('source', self.R)
         self.dSdA = self.S * (1 + self.S ** 2) / self.A
         self.dSdB = -self.S ** 3 / 2 / self.A ** 2
         self.dAdR = 1.0 / self.T

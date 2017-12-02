@@ -24,13 +24,13 @@ class TradingRRL(object):
         self.r = None
         self.x = np.zeros([T, M + 2])
         self.F = np.zeros((T + 1, N))
-        self.R = np.zeros((N,T))
+        self.R = np.zeros((T, N))
         self.w = np.ones((M + 2, N))
         self.w_opt = np.ones((M + 2, N))
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
         self.progress_period = 100
-        self.q_threshold = 0.5
+        self.q_threshold = 0.7
 
     def load_csv(self, fname):
         tmp = pd.read_csv(fname, header=0, low_memory=False)
@@ -38,12 +38,22 @@ class TradingRRL(object):
         print(tmp.shape)
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
         tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
-        print(tmp_p)
-        self.all_t = np.array(tmp_t)
-        self.all_p = np.array(tmp_p)#.reshape((1, -1))[0]
-        print('all_p', self.all_p)
+        self.all_t = np.array(tmp_t[::-1])
+        self.all_p = np.array(tmp_p[::-1])#.reshape((1, -1))[0]
+        print('all_p shape', self.all_p.shape)
+
+    def load_csv_test(self, fname):
+        tmp = pd.read_csv(fname, header=None)
+        tmp_tstr = tmp[0]
+        tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
+        tmp_p = list(tmp[5])
+        self.all_t = np.array(tmp_t[::-1])
+        self.all_p = np.array(tmp_p[::-1])
+        print('all_p shape', self.all_p.shape)
 
     def quant(self, f):
         fc = f.copy()
@@ -52,68 +62,58 @@ class TradingRRL(object):
 
     def set_t_p_r(self):
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
-        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,:]
+        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,:] ## TODO: add column dimension for assets > 1
         self.r = -np.diff(self.p, axis=0)
-        print('all_t', self.all_t.shape)
-        print('all_p', self.all_p.shape)
-        print('p', self.p.shape)
+        print('p dimension', self.p.shape)
         print('r dimension', self.r.shape)
 
     def set_x_F(self):
         for i in range(self.T - 1, -1, -1):
             self.x[i] = np.zeros(self.M + 2)
             self.x[i][0] = 1.0
-            self.x[i][self.M + 2 - 1] = self.F[-1, -1]
+            self.x[i][self.M + 2 - 1] = self.F[i+1,-1] ## TODO: i used -1 on column
             for j in range(1, self.M + 2 - 1, 1):
-                self.x[i][j] = self.r[i, j - 1]
-        self.F[0] = np.zeros(self.N)
-        self.F[1:] = np.tanh(np.dot(self.x, self.w))
-        print('f dimension', self.F.shape)
-        print('x dimension', self.x.shape)
+                self.x[i][j] = self.r[i, j - 1] ## TODO: i used -1 on column
+            self.F[i] = np.tanh(np.dot(self.x[i], self.w))
 
     def calc_R(self):
         #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
-        self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
-        print('R', self.R.shape)
+        #self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
+        self.R = self.mu * (np.multiply(self.F[1:,], np.reshape(self.r[:self.T], (self.T, -1))) - self.sigma * np.abs(-np.diff(self.F, axis=0)))
 
     def calc_sumR(self):
-        self.sumR = np.cumsum(self.R, axis=0)
-        self.sumR2 = np.cumsum((self.R ** 2)[::-1,:], axis=0)[::-1]
-        print('sumr', self.sumR.shape)
-        print('sumr2', self.sumR2.shape)
+        self.sumR = np.cumsum(self.R[::-1], axis=0)[::-1] ## TODO: cumsum axis
+        self.sumR2 = np.cumsum((self.R ** 2)[::-1], axis=0)[::-1] ## TODO: cumsum axis
 
     def calc_dSdw(self):
         self.set_x_F()
         self.calc_R()
         self.calc_sumR()
 
-        self.S = np.array([]) # a list of period-to-date sharpe ratios, for all n investments
-        for i in range(self.N - 2, -1, -1):
-            #self.A = np.sum(self.sumR[:,i]) / self.T
-            #self.B = np.sum(self.sumR2[:,i]) / self.T
+        self.Sall = []  # a list of period-to-date sharpe ratios, for all n investments
 
-            self.A = np.mean(self.R[:,i], axis=0)
-            self.B = np.mean(self.R[:,i]**2, axis=0)
-            self.S_i = self.A / np.sqrt(self.B - self.A ** 2)
-            self.dSdA = self.S_i * (1 + self.S_i ** 2) / self.A
-            self.dSdB = -self.S_i ** 3 / 2 / self.A ** 2
+        for j in range(self.N-1, -1, -1):
+            self.A = self.sumR[0,j] / self.T
+            self.B = self.sumR2[0,j] / self.T
+            self.S = self.A / np.sqrt(self.B - self.A ** 2)
+            self.dSdA = self.S * (1 + self.S ** 2) / self.A
+            self.dSdB = -self.S ** 3 / 2 / self.A ** 2
             self.dAdR = 1.0 / self.T
-            self.dBdR = 2.0 / self.T * self.R[:,i]
-            self.dRdF = -self.mu * self.sigma * (np.sign(-np.diff(self.F,axis=1)))
-            self.dRdFp = self.mu * self.r[self.M,:-1] + self.mu * self.sigma * np.sign(-np.diff(self.F,axis=1))
+            self.dBdR = 2.0 / self.T * self.R[:,j]
+            self.dRdF = -self.mu * self.sigma * np.sign(-np.diff(self.F, axis=0))
+            self.dRdFp = self.mu * self.r[:self.T] + self.mu * self.sigma * np.sign(-np.diff(self.F, axis=0))  ## TODO: r needs to be a matrix if assets > 1
             self.dFdw = np.zeros(self.M + 2)
             self.dFpdw = np.zeros(self.M + 2)
             self.dSdw = np.zeros((self.M + 2, self.N))
             self.dSdw_j = np.zeros(self.M + 2)
-            for j in range(self.T - 1, -1, -1):
-                if j != self.T - 1:
+            for i in range(self.T - 1, -1, -1):
+                if i != self.T - 1:
                     self.dFpdw = self.dFdw.copy()
-                self.dFdw = (1 - self.F[j,i] ** 2) * (self.x[j] + self.w[self.M + 2 - 1,i] * self.dFpdw)
-                self.dSdw_j += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[j]) * (self.dRdF[j,i] * self.dFdw + self.dRdFp[j,i] * self.dFpdw)
-
-            self.dSdw[:,i] = self.dSdw_j
-            self.S.append(self.S_i)
-
+                self.dFdw = (1 - self.F[i] ** 2) * (self.x[i] + self.w[self.M + 2 - 1] * self.dFpdw)
+                self.dSdw_j += (self.dSdA * self.dAdR + self.dSdB * self.dBdR[i]) * (
+                    self.dRdF[i,j] * self.dFdw + self.dRdFp[i,j] * self.dFpdw)
+            self.dSdw[:, j] = self.dSdw_j
+            self.Sall.append(self.S)
 
     def update_w(self):
         self.w += self.rho * self.dSdw
@@ -123,30 +123,30 @@ class TradingRRL(object):
         pre_epoch_times = len(self.epoch_S)
 
         self.calc_dSdw()
-        print("Epoch loop start. Initial sharp's ratio is " + str(np.max(self.S)) + ".")
-        self.S_opt = self.S
+        print("Epoch loop start. Initial sharp's ratio is " + str(self.S) + ".")
+        self.S_opt = self.Sall[0]
 
         tic = time.clock()
+        print('s', self.Sall)
         for e_index in range(self.n_epoch):
-            print('e_index', e_index)
             self.calc_dSdw()
-            if np.max(self.S) > np.max(self.S_opt):
-                self.S_opt = self.S
+            if self.Sall[0] > self.S_opt:
+                self.S_opt = self.Sall
                 self.w_opt = self.w.copy()
-            self.epoch_S = np.append(self.epoch_S, self.S)
+            self.epoch_S = np.append(self.epoch_S, self.Sall)
             self.update_w()
             if e_index % self.progress_period == self.progress_period - 1:
                 toc = time.clock()
                 print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
-                    self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(np.max(self.S)) + ". Elapsed time: " + str(
+                    self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.Sall) + ". Elapsed time: " + str(
                     toc - tic) + " sec.")
         toc = time.clock()
         print("Epoch: " + str(e_index + pre_epoch_times + 1) + "/" + str(
-            self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(np.max(self.S)) + ". Elapsed time: " + str(
+            self.n_epoch + pre_epoch_times) + ". Shape's ratio: " + str(self.Sall) + ". Elapsed time: " + str(
             toc - tic) + " sec.")
         self.w = self.w_opt.copy()
         self.calc_dSdw()
-        print("Epoch loop end. Optimized sharp's ratio is " + str(np.max(self.S_opt)) + ".")
+        print("Epoch loop end. Optimized sharp's ratio is " + str(self.S_opt) + ".")
 
     def save_weight(self):
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
@@ -207,17 +207,17 @@ def plot_hist(n_tick, R):
 
 def main():
     #fname = '../../util/stock_dfs/A.csv'
-    # fname = 'USDJPY30.csv'
+    #fname = 'USDJPY30.csv'
     fname = 'all_data.csv'
     # all_init_data()
 
-    init_t = 1001
+    init_t = 6000
 
     T = 1000
-    M = 60
-    N = 424
+    M = 200
+    N = 1
     mu = 10000
-    sigma = 0.03
+    sigma = 0.04
     rho = 1.0
     n_epoch = 10000
 
@@ -225,16 +225,13 @@ def main():
     ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     ini_rrl.load_csv(fname)
     ini_rrl.set_t_p_r()
-    print('starting derivative calc')
     ini_rrl.calc_dSdw()
-    print('finished 1')
     # RRL agent for training
     rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
     rrl.fit()
-    print('finished 2')
     rrl.save_weight()
 
     # Plot results.
