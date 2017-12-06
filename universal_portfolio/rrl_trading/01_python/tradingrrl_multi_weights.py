@@ -30,7 +30,7 @@ class TradingRRL(object):
         self.epoch_S = np.empty(0)
         self.n_epoch = n_epoch
         self.progress_period = 100
-        self.q_threshold = 0.7
+        self.q_threshold = 0.5
 
     def load_csv(self, fname):
         tmp = pd.read_csv(fname, header=0, low_memory=False)
@@ -39,8 +39,8 @@ class TradingRRL(object):
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
         #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+        tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
         self.all_t = np.array(tmp_t[::-1])
         self.all_p = np.array(tmp_p[::-1])#.reshape((1, -1))[0]
@@ -58,7 +58,20 @@ class TradingRRL(object):
     def quant(self, f):
         fc = f.copy()
         fc[np.where(np.abs(fc) < self.q_threshold)] = 0
-        return np.sign(fc)
+        #return np.sign(fc)
+        return fc
+
+    def softmax(self, x):
+        orig_shape = x.shape
+        # Matrix
+        if len(x.shape) > 1:
+            softmax = np.zeros(orig_shape)
+            for i, col in enumerate(x):
+                softmax[i] = np.exp(col - np.max(col)) / np.sum(np.exp(col - np.max(col)))
+        # vector
+        else:
+            softmax = np.exp(x - np.max(x)) / np.sum(np.exp(x - np.max(x)))
+        return softmax
 
     def set_t_p_r(self):
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
@@ -75,8 +88,8 @@ class TradingRRL(object):
             for j in range(1, self.M + 2 - 1, 1):
                 #self.x[i][j] = self.r[i+ j - 1,0] ## TODO: i used -1 on column
                 self.x[i,j] = self.r[i + j - 1, -1]  ## TODO: i used -1 on column
-            self.F[i] = np.tanh(np.dot(self.x[i], self.w))
-        #print('check', self.F)
+            self.F[i] = self.quant(np.tanh(np.dot(self.x[i], self.w)))  ## TODO: test this
+            #self.F[i] = np.tanh(np.dot(self.x[i], self.w))
 
     def calc_R(self):
         #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
@@ -93,8 +106,8 @@ class TradingRRL(object):
         self.calc_sumR()
 
         self.Sall = []  # a list of period-to-date sharpe ratios, for all n investments
-
-        for j in range(self.N-1, -1, -1):
+        self.dSdw = np.zeros((self.M + 2, self.N))
+        for j in range(self.N):
             self.A = self.sumR[0,j] / self.T
             self.B = self.sumR2[0,j] / self.T
             self.S = self.A / np.sqrt(self.B - self.A ** 2)
@@ -106,7 +119,7 @@ class TradingRRL(object):
             self.dRdFp = self.mu * self.r[:self.T] + self.mu * self.sigma * np.sign(-np.diff(self.F, axis=0))  ## TODO: r needs to be a matrix if assets > 1
             self.dFdw = np.zeros(self.M + 2)
             self.dFpdw = np.zeros(self.M + 2)
-            self.dSdw = np.zeros((self.M + 2, self.N))
+            #self.dSdw = np.zeros((self.M + 2, self.N))  ## TODO: should not have put this here. this resets everytime
             self.dSdw_j = np.zeros(self.M + 2)
             for i in range(self.T - 1, -1, -1):
                 if i != self.T - 1:
@@ -151,9 +164,12 @@ class TradingRRL(object):
         print("Epoch loop end. Optimized sharp's ratio is " + str(np.mean(self.S_opt)) + ".")
 
     def save_weight(self):
+        self.F1 = self.softmax(self.F)
+
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
         pd.DataFrame(self.epoch_S).to_csv("epoch_S.csv", header=False, index=False)
         pd.DataFrame(self.F).to_csv("f.csv", header=False, index=False)
+        pd.DataFrame(self.F1).to_csv("f1.csv", header=False, index=False)
 
     def load_weight(self):
         tmp = pd.read_csv("w.csv", header=None)
@@ -210,14 +226,14 @@ def plot_hist(n_tick, R):
 def main():
     #fname = '../../util/stock_dfs/A.csv'
     #fname = 'USDJPY30.csv'
-    fname = 'all_data_test.csv'
+    fname = 'all_data.csv'
     # all_init_data()
 
     init_t = 1001
 
     T = 1000
     M = 200
-    N = 2
+    N = 424
     mu = 10000
     sigma = 0.04
     rho = 1.0
