@@ -15,7 +15,7 @@ class TradingRRL(object):
         self.T = T
         self.M = M
         self.N = N
-        self.TOP = 2
+        self.TOP = 1
         self.threshold = 0.0
         self.init_t = init_t
         self.mu = mu
@@ -171,6 +171,7 @@ class TradingRRL(object):
             toc - tic) + " sec.")
         self.w = self.w_opt.copy()
         self.calc_dSdw()
+        self.Sall = np.apply_along_axis(self.select_n, 0, self.Sall)
         print("Epoch loop end. Optimized sharp's ratio is " + str(self.Sall[self.Sall.nonzero()].mean()) + ".")
         print('first check', self.Sall)
         print('now check', self.epoch_S)
@@ -182,6 +183,7 @@ class TradingRRL(object):
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
         self.epoch_S.to_csv("epoch_S.csv", header=False, index=False)
         pd.DataFrame(self.F).to_csv("f.csv", header=False, index=False)
+        pd.DataFrame(self.FS).to_csv("fs.csv", header=False, index=False)
         pd.DataFrame(self.F1).to_csv("f1.csv", header=False, index=False)
 
     def load_weight(self):
