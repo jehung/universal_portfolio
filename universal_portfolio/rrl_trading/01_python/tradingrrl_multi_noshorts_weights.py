@@ -68,10 +68,10 @@ class TradingRRL(object):
         return fc
 
     def softmax(self, x):
-        #l2_norm = np.sqrt(x*x).sum(axis=1)
-        #return x/l2_norm.reshape(x.shape[0], -1)
-        e_x = np.exp(x)
-        return e_x / e_x.sum()
+        l2_norm = np.sqrt(x*x).sum()
+        return x/l2_norm
+        #e_x = np.exp(x)
+        #return e_x / e_x.sum()
 
     def set_t_p_r(self):
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
@@ -94,6 +94,7 @@ class TradingRRL(object):
         #self.R = self.mu * (np.dot(self.r[:self.T], self.F[:,1:]) - self.sigma * np.abs(-np.diff(self.F, axis=1)))
         #self.R = self.mu * (self.r[:self.T] * self.F[1:]) - self.sigma * np.abs(-np.diff(self.F, axis=0))
         self.R = self.mu * (np.multiply(self.F[1:,], np.reshape(self.r[:self.T], (self.T, -1))) - self.sigma * np.abs(-np.diff(self.F, axis=0)))
+        #print('R dimension', self.R.shape)
 
     def calc_sumR(self):
         self.sumR = np.cumsum(self.R[::-1], axis=0)[::-1] ## TODO: cumsum axis
@@ -135,7 +136,8 @@ class TradingRRL(object):
     def get_investment_weights(self):
         for i in range(self.FS.shape[0]):
             self.FS[i] = np.multiply(self.F[i], self.Sall)
-        return np.apply_along_axis(self.softmax, 1, self.FS)
+        tmp = np.apply_along_axis(self.softmax, 1, self.FS)
+        return np.apply_along_axis(self.select_n, 1, tmp)
 
     def select_n(self, array):
         threshold = max(heapq.nlargest(self.TOP, array)[-1], self.threshold)
@@ -156,8 +158,7 @@ class TradingRRL(object):
             if np.mean(self.Sall) > np.mean(self.S_opt):
                 self.S_opt = self.Sall
                 self.w_opt = self.w.copy()
-            #self.epoch_S = np.concatenate(self.epoch_S, self.Sall) # TODO: put this back later
-            self.Sall = np.apply_along_axis(self.select_n, 0, self.Sall)
+            #self.Sall = np.apply_along_axis(self.select_n, 0, self.Sall) # TODO: don't do this here
             self.epoch_S[e_index] = np.array(self.Sall)
             self.update_w()
             if e_index % self.progress_period == self.progress_period - 1:
@@ -171,10 +172,10 @@ class TradingRRL(object):
             toc - tic) + " sec.")
         self.w = self.w_opt.copy()
         self.calc_dSdw()
-        self.Sall = np.apply_along_axis(self.select_n, 0, self.Sall)
         print("Epoch loop end. Optimized sharp's ratio is " + str(self.Sall[self.Sall.nonzero()].mean()) + ".")
         print('first check', self.Sall)
         print('now check', self.epoch_S)
+        print('R', self.R)
 
 
     def save_weight(self):
