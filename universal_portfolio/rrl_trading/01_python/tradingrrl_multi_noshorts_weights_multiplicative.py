@@ -91,8 +91,11 @@ class TradingRRL(object):
         #return e_x / e_x.sum()
 
     def set_t_p_r(self):
+        #self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
+        #self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,:] ## TODO: add column dimension for assets > 1
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
-        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,:] ## TODO: add column dimension for assets > 1
+        self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1,
+                 :]  ## TODO: add column dimension for assets > 1
         print('p dimension', self.p)
         #self.r = -np.diff(self.p, axis=0)
         firstr = np.zeros((1, self.p.shape[1]))
@@ -222,13 +225,16 @@ class TradingRRL(object):
         tmp = pd.read_csv("w.csv", header=None)
         self.w = tmp.T.values[0]
 
-    def get_investment_sum(self):
+    def get_investment_sum(self, train_phase=True):
         firstR = np.zeros((1,self.p.shape[1]))
         self.R = np.concatenate((firstR, self.R), axis=0)
         tmp = np.multiply(self.R, self.F1)
         self.total = self.mu * ((1+tmp.sum(axis=1)).cumprod(axis=0))
         print('iam here', self.total.shape, self.total)
-        pd.DataFrame(self.total).to_csv('investment_sum.csv')
+        if train_phase:
+            pd.DataFrame(self.total).to_csv('investment_sum.csv')
+        else:
+            pd.DataFrame(self.total).to_csv('investment_sum_testphase.csv')
 
 
 def get_ticker(x):
@@ -294,13 +300,13 @@ def main():
     n_epoch = 100
 
     # RRL agent with initial weight.
-    ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
+    ini_rrl = TradingRRL(T, M, N, init_t-T, mu, sigma, rho, n_epoch)
     ini_rrl.load_csv_test(fname)
     ini_rrl.load_bench(bench)
     ini_rrl.set_t_p_r()
     ini_rrl.calc_dSdw()
     # RRL agent for training
-    rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
+    rrl = TradingRRL(T, M, N, init_t-T, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
@@ -335,31 +341,36 @@ def main():
 
     plt.savefig("rrl_training.png", dpi=300)
 
-
+'''
     # Prediction for next term T with optimized weight.
     # RRL agent with initial weight.
-    ini_rrl_f = TradingRRL(T, M, N, init_t - T, mu, sigma, rho, n_epoch)
+    ini_rrl_f = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
     ini_rrl_f.set_t_p_r()
     ini_rrl_f.calc_dSdw()
     # RRL agent with optimized weight.
-    rrl_f = TradingRRL(T, M, N, init_t - T, mu, sigma, rho, n_epoch)
+    rrl_f = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
     rrl_f.set_t_p_r()
     rrl_f.w = rrl.w
+    rrl_f.F1 = rrl.F1
     rrl_f.calc_dSdw()
+    rrl_f.get_investment_sum(train_phase=False)
+
 
     fig, ax = plt.subplots(nrows=2, figsize=(15, 10))
-    ax[0].plot(rrl.bench[:rrl_f.T])
-    ax[0].plot(rrl.total[:rrl_f.T])
+    ax[0].plot(ini_rrl.bench[:rrl.T], color='red', label='Benchmark')
+    ax[0].plot(ini_rrl.bench[rrl.T:], color='purple', label='Benchmark')
     ax[0].set_xlabel("time")
     ax[0].set_ylabel("USDJPY: benchmark")
     ax[0].grid(True)
 
-    ax[1].plot(ini_rrl.bench, color="red", label="Benchmark")
-    ax[1].plot(rrl_f.total, color="red", label="With optimized weights")
+    ax[1].plot(ini_rrl.bench[:rrl.T], color='red', label='Benchmark: before day 1000')
+    ax[1].plot(ini_rrl.bench[rrl.T:], color='purple', label='Benchmark: after day 1000')
+    ax[1].plot(rrl.total, color="blue", label="With optimized weights: before day 1000")
+    ax[1].plot(rrl_f.total, color="blue", label="With optimized weights: after day 1000")
     ax[1].set_xlabel("time")
     ax[1].set_ylabel("Total Investment")
     ax[1].legend(loc="upper left")
@@ -367,7 +378,7 @@ def main():
 
     plt.savefig("rrl_prediction.png", dpi=300)
     fig.clear()
-
+'''
 
 if __name__ == "__main__":
     main()
