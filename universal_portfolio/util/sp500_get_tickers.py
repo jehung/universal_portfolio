@@ -31,21 +31,21 @@ def get_data_from_yahoo(reload_sp500=False):
     if reload_sp500:
         tickers = save_sp500_tickers()
     else:
-        with open("sp500tickers.pickle","rb") as f:
+        with open("Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/sp500tickers.pickle","rb") as f:
             tickers = pickle.load(f)
 
-    if not os.path.exists('stock_dfs'):
-        os.makedirs('stock_dfs')
+    if not os.path.exists('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs'):
+        os.makedirs('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs')
 
     start = dt.datetime(2008, 1, 1)
     end = dt.datetime(2016, 12, 31)
 
     for ticker in tickers:
         # just in case your connection breaks, we'd like to save our progress!
-        if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
+        if not os.path.exists('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs/{}.csv'.format(ticker)):
             try:
                 df = web.DataReader(ticker, "yahoo", start, end)
-                df.to_csv('stock_dfs/{}.csv'.format(ticker))
+                df.to_csv('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs/{}.csv'.format(ticker))
                 ticker_count += 1
             except:
                 continue
