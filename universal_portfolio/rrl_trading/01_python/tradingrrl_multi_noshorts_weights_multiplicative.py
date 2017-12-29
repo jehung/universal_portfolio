@@ -14,7 +14,7 @@ class TradingRRL(object):
         self.T = T
         self.M = M
         self.N = N
-        self.TOP = 30
+        self.TOP = 371
         self.threshold = 0.0
         self.init_t = init_t
         self.mu = mu
@@ -56,7 +56,7 @@ class TradingRRL(object):
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
         #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
         #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
         self.all_t = np.array(tmp_t) # [::-1]
@@ -73,8 +73,8 @@ class TradingRRL(object):
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
         #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+        tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
         self.all_t = np.array(tmp_t) # [::-1]
         self.all_p = np.array(tmp_p)#.reshape((1, -1))[0] # [::-1]
@@ -319,11 +319,11 @@ def main():
     thisT = 200
     M = 200
     thisM = 20
-    N = 2 # TODO: no magic numbers!!! 371
+    N = 371 # TODO: no magic numbers!!! 371
     mu = 100
     sigma = 0.04
     rho = 1.0
-    n_epoch = 100
+    n_epoch = 500
 
     # RRL agent with initial weight.
     ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch) ## TODO: init_t is really a change point!!!
