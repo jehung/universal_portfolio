@@ -47,6 +47,20 @@ class TradingRRL(object):
         self.all_t = np.array(tmp_t[::-1])
         self.all_p = np.array(tmp_p[::-1])
 
+    def load_csv_test1(self, fname):
+        tmp = pd.read_csv(fname, header=0, low_memory=False)
+        print(tmp.head())
+        print(tmp.shape)
+        # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
+        tmp_tstr = tmp['Unnamed: 0']
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+        tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+        tmp_p = tmp.iloc[:, 1:]
+        self.all_t = np.array(tmp_t[::-1])
+        self.all_p = np.array(tmp_p[::-1])#.reshape((1, -1))[0]
+        print('all_p shape', self.all_p.shape)
+
     def quant(self, f):
         fc = f.copy()
         fc[np.where(np.abs(fc) < self.q_threshold)] = 0
@@ -56,6 +70,7 @@ class TradingRRL(object):
         self.t = self.all_t[self.init_t:self.init_t + self.T + self.M + 1]
         self.p = self.all_p[self.init_t:self.init_t + self.T + self.M + 1]
         self.r = -np.diff(self.p)
+        print('r dimension', self.r.shape)
 
     def set_x_F(self):
         for i in range(self.T - 1, -1, -1):
@@ -132,6 +147,7 @@ class TradingRRL(object):
     def save_weight(self):
         pd.DataFrame(self.w).to_csv("w.csv", header=False, index=False)
         pd.DataFrame(self.epoch_S).to_csv("epoch_S.csv", header=False, index=False)
+        pd.DataFrame(self.F).to_csv("f.csv", header=False, index=False)
 
     def load_weight(self):
         tmp = pd.read_csv("w.csv", header=None)
@@ -155,6 +171,7 @@ def plot_hist(n_tick, R):
 
 def main():
     fname = 'USDJPY30_source.csv'
+    #fname = 'USDJPY30.csv'
     init_t = 6000
 
     T = 1000
@@ -162,7 +179,7 @@ def main():
     mu = 10000
     sigma = 0.04
     rho = 1.0
-    n_epoch = 10000
+    n_epoch = 500
 
     # RRL agent with initial weight.
     ini_rrl = TradingRRL(T, M, init_t, mu, sigma, rho, n_epoch)
@@ -175,6 +192,7 @@ def main():
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
     rrl.fit()
+    rrl.save_weight()
 
     # Plot results.
     # Training for initial term T.
