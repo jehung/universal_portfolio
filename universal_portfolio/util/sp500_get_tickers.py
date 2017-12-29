@@ -25,6 +25,12 @@ tickers = save_sp500_tickers()
 print(tickers)
 
 
+def get_benchmark_from_yahoo(bench='SPY'):
+    start = dt.datetime(2008, 1, 1)
+    end = dt.datetime(2017, 12, 28)
+    df = web.DataReader(bench, "yahoo", start, end)
+    df.to_csv('../rrl_trading/01_python/SPY.csv'.format(bench))
+    return df
 
 def get_data_from_yahoo(reload_sp500=False):
     ticker_count = 0
@@ -53,4 +59,5 @@ def get_data_from_yahoo(reload_sp500=False):
     print('Total number of processed tickers (S&P500): ' + str(ticker_count))
 
 
+get_benchmark_from_yahoo()
 get_data_from_yahoo(True)
