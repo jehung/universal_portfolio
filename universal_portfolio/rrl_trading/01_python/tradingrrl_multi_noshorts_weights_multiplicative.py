@@ -6,8 +6,8 @@ from datetime import datetime as dt
 import matplotlib.pyplot as plt
 import heapq
 
-thisT = 200
-thisM = 20
+thisT = 252
+thisM = 60
 
 class TradingRRL(object):
     def __init__(self, T=1000, M=300, N=0, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10):
@@ -261,37 +261,6 @@ class TradingRRL(object):
             pd.DataFrame(self.total).to_csv('investment_sum_testphase.csv')
 
 
-def get_ticker(x):
-    return x.split('/')[-1].split('.')[0]
-
-
-def read_file(file, test=None):
-    d = pd.read_csv(file).set_index('Date')
-    d.fillna(0, inplace=True)
-    ticker = get_ticker(file)
-    d.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Adj Close': 'adj_close',
-                      'Volume': 'volume'},
-             inplace=True)
-
-    d.drop(labels=['open', 'high', 'low', 'close', 'volume'], axis=1, inplace=True)
-
-    return d
-
-
-def all_init_data():
-    filepath = '../../util/stock_dfs/'
-    alldata = []
-    for f in os.listdir(filepath):
-        datapath = os.path.join(filepath, f)
-        if datapath.endswith('.csv'):
-            # print(datapath)
-            Res = read_file(datapath)
-            alldata.append(Res)
-    alldata = pd.concat(alldata, axis=1)
-    alldata.fillna(0, inplace=True)
-    alldata
-    alldata.to_csv('all_data.csv')
-
 
 def plot_hist(n_tick, R):
     rnge = max(R) - min(R)
@@ -311,7 +280,7 @@ def main():
     #fname = '../../util/stock_dfs/A.csv'
     #fname = 'USDJPY30.csv'
     bench = 'SPY.csv'
-    fname = 'all_data.csv'
+    fname = 'all_data_todate.csv'
 
     init_t = 1001 #1001
 
@@ -319,7 +288,7 @@ def main():
     thisT = 200
     M = 200
     thisM = 20
-    N = 371 # TODO: no magic numbers!!! 371
+    N = 379 # TODO: no magic numbers!!! 371
     mu = 100
     sigma = 0.04
     rho = 1.0
