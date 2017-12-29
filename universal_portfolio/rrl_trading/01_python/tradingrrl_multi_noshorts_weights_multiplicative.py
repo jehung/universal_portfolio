@@ -6,15 +6,44 @@ from datetime import datetime as dt
 import matplotlib.pyplot as plt
 import heapq
 
-thisT = 252
-thisM = 60
+
+def load_bench(bench):
+    mu = 100
+    tmp = pd.read_csv(bench, header=0, low_memory=False)
+    tmp.set_index('Date', inplace=True)
+    tmp = tmp['Adj Close']
+    bench = mu * (1 + tmp.pct_change()).cumprod()
+    # self.bench = self.mu * np.diff(tmp, axis=0).cumsum()
+    print('bench', bench)
+    pd.DataFrame(bench).to_csv('bench.csv')
+    return bench
+
+def load_csv_test(fname):
+    tmp = pd.read_csv(fname, header=0, low_memory=False)
+    print(tmp.head())
+    print(tmp.shape)
+    tmp.replace(0, np.nan, inplace=True)
+    tmp.dropna(axis=1, how='any', inplace=True)
+    print('effect check', tmp.shape)
+    # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
+    tmp_tstr = tmp['Unnamed: 0']
+    # tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
+    # tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+    tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+    tmp_p = tmp.iloc[:, 1:]
+    all_t = np.array(tmp_t)  # [::-1]
+    all_p = np.array(tmp_p)  # .reshape((1, -1))[0] # [::-1]
+    print('all_p shape', all_p.shape)
+    return all_t, all_p
 
 class TradingRRL(object):
-    def __init__(self, T=1000, M=300, N=0, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10):
+    def __init__(self, T=1000, thisT = 1000, M=300, thisM = 300, N=0, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10):
         self.T = T
+        self.thisT = thisT
         self.M = M
+        self.thisM = thisM
         self.N = N
-        self.TOP = 371
+        self.TOP = 20
         self.threshold = 0.0
         self.init_t = init_t
         self.mu = mu
@@ -40,46 +69,6 @@ class TradingRRL(object):
         self.total = None
         self.bench = None
 
-
-    def load_bench(self, bench):
-        tmp = pd.read_csv(bench, header=0, low_memory=False)
-        tmp.set_index('Date', inplace=True)
-        self.bench = self.mu*(1+tmp.pct_change()).cumprod()
-        #self.bench = self.mu * np.diff(tmp, axis=0).cumsum()
-        print('bench', self.bench)
-        pd.DataFrame(self.bench).to_csv('bench.csv')
-
-    def load_csv(self, fname):
-        tmp = pd.read_csv(fname, header=0, low_memory=False)
-        print(tmp.head())
-        print(tmp.shape)
-        # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
-        tmp_tstr = tmp['Unnamed: 0']
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
-        tmp_p = tmp.iloc[:, 1:]
-        self.all_t = np.array(tmp_t) # [::-1]
-        self.all_p = np.array(tmp_p)#.reshape((1, -1))[0] # [::-1]
-        print('all_p shape', self.all_p.shape)
-
-    def load_csv_test(self, fname):
-        tmp = pd.read_csv(fname, header=0, low_memory=False)
-        print(tmp.head())
-        print(tmp.shape)
-        tmp.replace(0, np.nan, inplace=True)
-        tmp.dropna(axis=1, how='any', inplace=True)
-        print('effect check', tmp.shape)
-        # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
-        tmp_tstr = tmp['Unnamed: 0']
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
-        tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
-        tmp_p = tmp.iloc[:, 1:]
-        self.all_t = np.array(tmp_t) # [::-1]
-        self.all_p = np.array(tmp_p)#.reshape((1, -1))[0] # [::-1]
-        print('all_p shape', self.all_p.shape)
-
     def quant(self, f):
         fc = f.copy()
         fc[np.where(np.abs(fc) < self.q_threshold)] = 0
@@ -104,8 +93,8 @@ class TradingRRL(object):
             print('r dimension', self.r.shape)
             pd.DataFrame(self.r).to_csv("smallr.csv", header=False, index=False)
         else:
-            self.t = self.all_t[self.init_t:self.init_t + thisT + thisM + 1]
-            self.p = self.all_p[self.init_t:self.init_t + thisT + thisM + 1,:]  ## TODO: add column dimension for assets > 1
+            self.t = self.all_t[self.init_t:self.init_t + self.thisT + self.thisM + 1]
+            self.p = self.all_p[self.init_t:self.init_t + self.thisT + self.thisM + 1,:]  ## TODO: add column dimension for assets > 1
             print('p dimension', self.p.shape)
             # self.r = -np.diff(self.p, axis=0)
             firstr = np.zeros((1, self.p.shape[1]))
@@ -123,12 +112,14 @@ class TradingRRL(object):
                     self.x[i,j] = self.r[i + (j-1), -1]  ## TODO: i used -1 on column; and must deal with j
                 self.F[i] = self.quant(np.tanh(np.dot(self.x[i], self.w)+self.b[i]))   ## TODO: test this
         else:
-            thisw = np.ones((thisM+2, self.N))
-            for i in range(thisT - 1, -1, -1):
-                self.x[i] = np.zeros(thisM + 2)
+            thisw = np.ones((self.thisM+2, self.N))
+            self.x = np.zeros([self.thisT, self.thisM + 2])
+            self.F = np.zeros((self.thisT + 1, self.N))
+            for i in range(self.thisT - 1, -1, -1):
+                self.x[i] = np.zeros(self.thisM + 2)
                 self.x[i][0] = 1.0
-                self.x[i][thisM + 2 - 1] = self.F[i+1,-1] ## TODO: i used -1 on column
-                for j in range(1, thisM + 2 - 1, 1):
+                self.x[i][self.thisM + 2 - 1] = self.F[i+1,-1] ## TODO: i used -1 on column
+                for j in range(1, self.thisM + 2 - 1, 1):
                     #self.x[i][j] = self.r[i+ j - 1,0] ## TODO: i used -1 on column:
                     self.x[i,j] = self.r[i + (j-1), -1]  ## TODO: i used -1 on column; and must deal with j
                 self.F[i] = self.quant(np.tanh(np.dot(self.x[i], thisw)+self.b[i]))   ## TODO: test this
@@ -149,8 +140,8 @@ class TradingRRL(object):
 
     def calc_dSdw(self, train_phase=True):
         if not train_phase:
-            self.T = thisT
-            self.M = thisM
+            self.T = self.thisT
+            self.M = self.thisM
         self.set_x_F(train_phase=train_phase)
         self.calc_R()
         self.calc_sumR()
@@ -188,11 +179,15 @@ class TradingRRL(object):
     def update_w(self):
         self.w += self.rho * self.dSdw
 
-    def get_investment_weights(self):
+    def get_investment_weights(self, train_phase=True):
+        if not train_phase:
+            self.FS = np.zeros((self.thisT + 1, self.N))
+
         for i in range(self.FS.shape[0]):
             self.FS[i] = np.multiply(self.F[i], self.Sall)
         tmp = np.apply_along_axis(self.softmax, 1, self.FS)
         return np.apply_along_axis(self.select_n, 1, tmp)
+
 
     def select_n(self, array):
         threshold = max(heapq.nlargest(self.TOP, array)[-1], self.threshold)
@@ -243,7 +238,7 @@ class TradingRRL(object):
             pd.DataFrame(self.FS).to_csv("fs.csv", header=False, index=False)
             pd.DataFrame(self.F1).to_csv("f1.csv", header=False, index=False)
         else:
-            self.F1 = self.get_investment_weights()
+            self.F1 = self.get_investment_weights(train_phase=False)
 
     def load_weight(self):
         tmp = pd.read_csv("w.csv", header=None)
@@ -261,47 +256,36 @@ class TradingRRL(object):
             pd.DataFrame(self.total).to_csv('investment_sum_testphase.csv')
 
 
-
-def plot_hist(n_tick, R):
-    rnge = max(R) - min(R)
-    tick = rnge / n_tick
-    tick_min = [min(R) - tick * 0.5 + i * tick for i in range(n_tick)]
-    tick_max = [min(R) + tick * 0.5 + i * tick for i in range(n_tick)]
-    tick_center = [min(R) + i * tick for i in range(n_tick)]
-    tick_val = [0.0] * n_tick
-    for i in range(n_tick):
-        tick_val[i] = len(
-            set(np.where(tick_min[i] < np.array(R))[0].tolist()).intersection(np.where(np.array(R) <= tick_max[i])[0]))
-    plt.bar(tick_center, tick_val, width=tick)
-    plt.grid()
-    plt.show()
-
 def main():
     #fname = '../../util/stock_dfs/A.csv'
     #fname = 'USDJPY30.csv'
     bench = 'SPY.csv'
     fname = 'all_data_todate.csv'
 
+    all_t, all_p = load_csv_test(fname)
+    bench = load_bench(bench)
+
     init_t = 1001 #1001
 
-    T = 1000
-    thisT = 200
     M = 200
     thisM = 20
-    N = 379 # TODO: no magic numbers!!! 371
+    T = 1000
+    thisT = all_p.shape[0]-(init_t+T+M)-thisM
+    N = all_p.shape[1]
     mu = 100
     sigma = 0.04
     rho = 1.0
-    n_epoch = 500
+    n_epoch = 100
 
     # RRL agent with initial weight.
-    ini_rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch) ## TODO: init_t is really a change point!!!
-    ini_rrl.load_csv_test(fname)
-    ini_rrl.load_bench(bench)
+    ini_rrl = TradingRRL(T, thisT, M, thisM, N, init_t, mu, sigma, rho, n_epoch) ## TODO: init_t is really a change point!!!
+    ini_rrl.all_t = all_t
+    ini_rrl.all_p = all_p
+    ini_rrl.bench = bench
     ini_rrl.set_t_p_r()
     ini_rrl.calc_dSdw()
     # RRL agent for training
-    rrl = TradingRRL(T, M, N, init_t, mu, sigma, rho, n_epoch)
+    rrl = TradingRRL(T, thisT, M, thisM, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
     rrl.set_t_p_r()
@@ -311,23 +295,13 @@ def main():
 
     # Plot results.
     # Training for initial term T.
-    '''
-    plt.plot(range(len(rrl.epoch_S)), rrl.epoch_S)
-    plt.title("Sharp's ratio optimization")
-    plt.xlabel("Epoch times")
-    plt.ylabel("Sharp's ratio")
-    plt.grid(True)
-    plt.savefig("sharp's ratio optimization.png", dpi=300)
-    plt.close
-    '''
-
     fig, ax = plt.subplots(nrows=2, figsize=(15, 10))
-    ax[0].plot(ini_rrl.bench[:rrl.T], color='red', label='Benchmark')
+    ax[0].plot(ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark')
     ax[0].set_xlabel("time")
     ax[0].set_ylabel("SPY")
     ax[0].grid(True)
 
-    ax[1].plot(ini_rrl.bench[:rrl.T], color='red', label='Benchmark')
+    ax[1].plot(ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark')
     ax[1].plot(rrl.total, color="blue", label="With optimized weights")
     ax[1].set_xlabel("time")
     ax[1].set_ylabel("Total Invested")
@@ -339,13 +313,13 @@ def main():
 
     # Prediction for next term T with optimized weight.
     # RRL agent with initial weight.
-    ini_rrl_f = TradingRRL(thisT, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
+    ini_rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T+M, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
-    ini_rrl_f.set_t_p_r()
-    ini_rrl_f.calc_dSdw()
+    ini_rrl_f.set_t_p_r(train_phase=False)
+    ini_rrl_f.calc_dSdw(train_phase=False)
     # RRL agent with optimized weight.
-    rrl_f = TradingRRL(thisT, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
+    rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T+M, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
     rrl_f.set_t_p_r(train_phase=False)
@@ -372,8 +346,8 @@ def main():
 
     print('len check b', rrl.total.shape)
     print('len check b1', rrl_f.total.shape)
-    ax[1].plot(t[:rrl_f.T], ini_rrl.bench[:rrl_f.T], color='red', label='Benchmark: before day 1000')
-    ax[1].plot(t[rrl_f.T:], ini_rrl.bench[rrl_f.T:], color='purple', label='Benchmark: after day 1000')
+    ax[1].plot(t[init_t:init_t+rrl.T+rrl.M+1], ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark: before day 1000')
+    ax[1].plot(t[init_t+rrl.T+rrl.M+1:], ini_rrl.bench[init_t+rrl.T+rrl.M+1:], color='orange', label='Benchmark: after day 1000')
     ax[1].plot(t[:rrl.total.shape[0]], rrl.total, color="blue", label="With optimized weights: before day 1000")
     ax[1].plot(t[rrl.total.shape[0]:rrl.total.shape[0]+rrl_f.total.shape[0]], rrl_f.total, color="green", label="With optimized weights: before day 1000")
     ax[1].set_xlabel("time")
