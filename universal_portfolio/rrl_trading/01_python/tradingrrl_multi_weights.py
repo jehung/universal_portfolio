@@ -39,8 +39,8 @@ class TradingRRL(object):
         # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
         tmp_tstr = tmp['Unnamed: 0']
         #tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
-        #tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
-        tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
+        tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
+        #tmp_t = [dt.strptime(tmp_tstr[i], '%Y-%m-%d') for i in range(len(tmp_tstr))]
         tmp_p = tmp.iloc[:, 1:]
         self.all_t = np.array(tmp_t[::-1])
         self.all_p = np.array(tmp_p[::-1])#.reshape((1, -1))[0]
@@ -205,7 +205,7 @@ def all_init_data():
     alldata = pd.concat(alldata, axis=1)
     alldata.fillna(0, inplace=True)
     alldata
-    alldata.to_csv('all_data.csv')
+    alldata.to_csv('all_data_test.csv')
 
 
 def plot_hist(n_tick, R):
@@ -226,14 +226,14 @@ def plot_hist(n_tick, R):
 def main():
     #fname = '../../util/stock_dfs/A.csv'
     #fname = 'USDJPY30.csv'
-    fname = 'all_data.csv'
+    fname = 'all_data_test.csv'
     # all_init_data()
 
     init_t = 1001
 
     T = 1000
     M = 200
-    N = 424
+    N = 3
     mu = 10000
     sigma = 0.04
     rho = 1.0
