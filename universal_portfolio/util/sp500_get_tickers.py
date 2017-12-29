@@ -31,29 +31,26 @@ def get_data_from_yahoo(reload_sp500=False):
     if reload_sp500:
         tickers = save_sp500_tickers()
     else:
-        with open("Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/sp500tickers.pickle","rb") as f:
+        with open("sp500tickers.pickle","rb") as f:
             tickers = pickle.load(f)
 
-    if not os.path.exists('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs'):
-        os.makedirs('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs')
+    if not os.path.exists('stock_dfs'):
+        os.makedirs('stock_dfs')
 
     start = dt.datetime(2008, 1, 1)
-    end = dt.datetime(2016, 12, 31)
+    end = dt.datetime(2017, 12, 28)
 
     for ticker in tickers:
         # just in case your connection breaks, we'd like to save our progress!
-        if not os.path.exists('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs/{}.csv'.format(ticker)):
-            try:
-                df = web.DataReader(ticker, "yahoo", start, end)
-                df.to_csv('Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs/{}.csv'.format(ticker))
-                ticker_count += 1
-            except:
-                continue
-        else:
-            print('Already have {}'.format(ticker))
+        try:
+            df = web.DataReader(ticker, "yahoo", start, end)
+            df.to_csv('stock_dfs/{}.csv'.format(ticker))
+            ticker_count += 1
+        except:
+            continue
 
     print('Total number of tickers (S&P500): ' + str(len(tickers)))
-    print('Total number of processed tickers (S&P500): ' + ticker_count)
+    print('Total number of processed tickers (S&P500): ' + str(ticker_count))
 
 
 get_data_from_yahoo(True)
