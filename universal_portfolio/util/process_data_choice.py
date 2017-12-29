@@ -26,10 +26,10 @@ def make_inputs(filepath):
     Res = pd.DataFrame()
     ticker = get_ticker(filepath)
 
-    #Res['c_2_o'] = get_zscore(ret(D.Open,D.Close))
+    Res['c_2_o'] = get_zscore(ret(D.Open,D.Close))
     Res['h_2_o'] = get_zscore(ret(D.Open,D.High))
     Res['l_2_o'] = get_zscore(ret(D.Open,D.Low))
-    #Res['c_2_h'] = get_zscore(ret(D.High,D.Close))
+    Res['c_2_h'] = get_zscore(ret(D.High,D.Close))
     Res['h_2_l'] = get_zscore(ret(D.High,D.Low))
     Res['c1_c0'] = ret(D.Close,D.Close.shift(-1)).fillna(0) #Tommorows return
     Res['vol'] = get_zscore(D.Volume)
