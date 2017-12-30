@@ -7,6 +7,11 @@ import pickle
 import requests
 
 
+today = dt.datetime.now()
+today.year = today.year
+today.month = today.month
+today.day = today.day
+
 def save_sp500_tickers():
     resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup = bs.BeautifulSoup(resp.text, 'lxml')
@@ -27,7 +32,7 @@ print(tickers)
 
 def get_benchmark_from_yahoo(bench='SPY'):
     start = dt.datetime(2008, 1, 1)
-    end = dt.datetime(2017, 12, 28)
+    end = dt.datetime(today.year, today.month, today.day)
     df = web.DataReader(bench, "yahoo", start, end)
     df.to_csv('../rrl_trading/01_python/SPY.csv'.format(bench))
     return df
@@ -44,7 +49,7 @@ def get_data_from_yahoo(reload_sp500=False):
         os.makedirs('stock_dfs')
 
     start = dt.datetime(2008, 1, 1)
-    end = dt.datetime(2017, 12, 28)
+    end = dt.datetime(today.year, today.month, today.day)
 
     for ticker in tickers:
         # just in case your connection breaks, we'd like to save our progress!
