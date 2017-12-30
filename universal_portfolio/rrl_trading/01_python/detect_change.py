@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 def readfile(filename):
     """
-    Description:    Expects a list of numbers seperated by the new line character
+    Description:    Expects a list of numbers
     Arguments:      filename
     Notes:          Does not check for errors
     """
@@ -23,7 +23,6 @@ def readfile(filename):
 
     tmp = pd.read_csv(filename, header=0, low_memory=False)
     #tmp.set_index('Date', inplace=True)
-    print(tmp['Adj Close'])
     return tmp['Adj Close']
 
 
@@ -106,7 +105,7 @@ def find_index_of_maximum(cumsum):
     return max_index
 
 
-def get_changepoints(data, change_points, confidence_level=90, offset=0):
+def get_changepoints(data, change_points, confidence_level=100, offset=0):
     """
     Description:    Call the function by passing a data series
                     Once a change has been detected, break the data into two segments,
@@ -116,8 +115,8 @@ def get_changepoints(data, change_points, confidence_level=90, offset=0):
     if not change_points:
         change_points = []
 
-    confidence = bootstrap(data, 1000)
-    if (confidence > confidence_level):
+    confidence = bootstrap(data, 100000)
+    if (confidence >= confidence_level):
         cumsum = cumsums(data)
         max_index = find_index_of_maximum(cumsum)
 
@@ -136,22 +135,18 @@ def main():
     fname = 'SPY.csv'
     raw = readfile(fname)
     data = raw.tolist()
-    smoothed = raw.rolling(window=10).mean()
+    smoothed = raw.rolling(window=20, min_periods=1).mean().tolist()
+    print(smoothed)
 
     change_points = []
-    points = get_changepoints(data, change_points)
+    points = get_changepoints(smoothed, change_points)
     sorted_changepoints = sorted(points)
+    print(sorted_changepoints)
 
-    change_points1 = []
-    points1 = get_changepoints(smoothed, change_points1)
-    sorted_changepoints1 = sorted(points1)
-    print(sorted_changepoints1)
-
-
-    plt.plot(data)
-    plt.plot(smoothed)
-    for c in sorted_changepoints1:
-        plt.axvline(x=c)
+    plt.plot(data, color='red')
+    plt.plot(smoothed, color='blue')
+    for c in sorted_changepoints:
+        plt.axvline(x=c, color='g')
     plt.show()
 
 if __name__ == '__main__':
