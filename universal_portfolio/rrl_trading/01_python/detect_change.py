@@ -23,8 +23,8 @@ def readfile(filename):
 
     tmp = pd.read_csv(filename, header=0, low_memory=False)
     #tmp.set_index('Date', inplace=True)
-    print(tmp.adj_close)
-    return tmp.adj_close
+    print(tmp['Adj Close'])
+    return tmp['Adj Close']
 
 
 def cumsums(data):
@@ -120,7 +120,6 @@ def get_changepoints(data, change_points, confidence_level=90, offset=0):
     if (confidence > confidence_level):
         cumsum = cumsums(data)
         max_index = find_index_of_maximum(cumsum)
-        print('max_index', max_index)
 
         # add change point found to list
         # use offset to find the correct index based on original data
@@ -128,27 +127,32 @@ def get_changepoints(data, change_points, confidence_level=90, offset=0):
 
         # split the data into two, and calculate change points
         get_changepoints(data[:max_index], change_points, confidence_level, offset)
-        print('change point first-part at ',  max_index)
+        get_changepoints(data[max_index:], change_points, confidence_level, offset + max_index - 1)
 
-        try:
-            get_changepoints(data[max_index:], change_points, confidence_level, offset + max_index - 1)
-        except:
-            print('exception secondpart at ', max_index)
-            pass
     return change_points
 
 
 def main():
     fname = 'SPY.csv'
-    data = readfile(fname)
-
-    data.plot()
-    plt.show()
+    raw = readfile(fname)
+    data = raw.tolist()
+    smoothed = raw.rolling(window=10).mean()
 
     change_points = []
     points = get_changepoints(data, change_points)
-    print(points)
+    sorted_changepoints = sorted(points)
 
+    change_points1 = []
+    points1 = get_changepoints(smoothed, change_points1)
+    sorted_changepoints1 = sorted(points1)
+    print(sorted_changepoints1)
+
+
+    plt.plot(data)
+    plt.plot(smoothed)
+    for c in sorted_changepoints1:
+        plt.axvline(x=c)
+    plt.show()
 
 if __name__ == '__main__':
     main()
