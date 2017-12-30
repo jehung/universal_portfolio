@@ -11,7 +11,7 @@ def load_bench(bench):
     mu = 100
     tmp = pd.read_csv(bench, header=0, low_memory=False)
     tmp.set_index('Date', inplace=True)
-    tmp = tmp['Adj Close']
+    tmp = tmp['Adj Close'][1001:]
     bench = mu * (1 + tmp.pct_change()).cumprod()
     # self.bench = self.mu * np.diff(tmp, axis=0).cumsum()
     print('bench', bench)
@@ -185,8 +185,12 @@ class TradingRRL(object):
 
         for i in range(self.FS.shape[0]):
             self.FS[i] = np.multiply(self.F[i], self.Sall)
-        tmp = np.apply_along_axis(self.softmax, 1, self.FS)
-        return np.apply_along_axis(self.select_n, 1, tmp)
+        tmp = np.apply_along_axis(self.select_n, 1, self.FS) # TODO: conisder taking the abs(): magnitutde
+        return np.apply_along_axis(self.softmax, 1, tmp)
+
+
+        #tmp = np.apply_along_axis(self.softmax, 1, self.FS)
+        #return np.apply_along_axis(self.select_n, 1, tmp)
 
 
     def select_n(self, array):
@@ -272,7 +276,7 @@ def main():
     T = 1000
     thisT = all_p.shape[0]-(init_t+T+M)-thisM
     N = all_p.shape[1]
-    mu = 100
+    mu = 100#bench[init_t]
     sigma = 0.04
     rho = 1.0
     n_epoch = 100
@@ -293,16 +297,26 @@ def main():
     rrl.save_weight()
     rrl.get_investment_sum()
 
+
     # Plot results.
     # Training for initial term T.
+
+
     fig, ax = plt.subplots(nrows=2, figsize=(15, 10))
-    ax[0].plot(ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark')
+    t = np.linspace(0, ini_rrl.bench.shape[0], ini_rrl.bench.shape[0])
+    print('x len', len(t[init_t:init_t + rrl.T+1]))
+    print('y len', rrl.total.shape[0])
+    print('x1 len', len(t[init_t:init_t + rrl.T + 1]))
+    print('y2 len', ini_rrl.bench.shape[0])
+    ax[0].plot(t[:ini_rrl.T], ini_rrl.bench[:ini_rrl.T], color='red', label='Benchmark: training phase')
+    ax[0].plot(t[ini_rrl.T:], ini_rrl.bench[ini_rrl.T:], color='purple', label='Benchmark: after training phase')
     ax[0].set_xlabel("time")
     ax[0].set_ylabel("SPY")
     ax[0].grid(True)
 
-    ax[1].plot(ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark')
-    ax[1].plot(rrl.total, color="blue", label="With optimized weights")
+    ax[1].plot(t[:ini_rrl.T], ini_rrl.bench[:ini_rrl.T], color='red', label='Benchmark: before start of training')
+    ax[1].plot(t[ini_rrl.T:], ini_rrl.bench[ini_rrl.T:], color='orange',label='Benchmark: start training')
+    ax[1].plot(t[:rrl.T+1], rrl.total, color="blue", label="With optimized weights")
     ax[1].set_xlabel("time")
     ax[1].set_ylabel("Total Invested")
     ax[1].legend(loc="best")
@@ -313,13 +327,13 @@ def main():
 
     # Prediction for next term T with optimized weight.
     # RRL agent with initial weight.
-    ini_rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T+M, mu, sigma, rho, n_epoch)
+    ini_rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
     ini_rrl_f.set_t_p_r(train_phase=False)
     ini_rrl_f.calc_dSdw(train_phase=False)
     # RRL agent with optimized weight.
-    rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T+M, mu, sigma, rho, n_epoch)
+    rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
     rrl_f.set_t_p_r(train_phase=False)
@@ -337,8 +351,8 @@ def main():
     print('check len2', len(t[rrl_f.T:]))
     print('check len3', len(ini_rrl.bench[:rrl_f.T]))
     print('check len4', len(ini_rrl.bench[rrl_f.T:]))
-    ax[0].plot(t[:rrl_f.T], ini_rrl.bench[:rrl_f.T], color='red', label='Benchmark')
-    ax[0].plot(t[rrl_f.T:], ini_rrl.bench[rrl_f.T:], color='orange', label='Benchmark')
+    ax[0].plot(t[:rrl_f.T], ini_rrl.bench[:rrl_f.T], color='red', label='Benchmark: training phase')
+    ax[0].plot(t[rrl_f.T:], ini_rrl.bench[rrl_f.T:], color='orange', label='Benchmark: post-training phase')
     ax[0].set_xlabel("time")
     ax[0].set_ylabel("SPY: benchmark")
     ax[0].grid(True)
@@ -346,8 +360,8 @@ def main():
 
     print('len check b', rrl.total.shape)
     print('len check b1', rrl_f.total.shape)
-    ax[1].plot(t[init_t:init_t+rrl.T+rrl.M+1], ini_rrl.bench[init_t:init_t+rrl.T+rrl.M+1], color='red', label='Benchmark: before day 1000')
-    ax[1].plot(t[init_t+rrl.T+rrl.M+1:], ini_rrl.bench[init_t+rrl.T+rrl.M+1:], color='orange', label='Benchmark: after day 1000')
+    ax[1].plot(t[:rrl_f.T], ini_rrl.bench[:rrl_f.T], color='red', label='Benchmark: training phase')
+    ax[1].plot(t[rrl_f.T:], ini_rrl.bench[rrl_f.T:], color='orange', label='Benchmark: post-training phase')
     ax[1].plot(t[:rrl.total.shape[0]], rrl.total, color="blue", label="With optimized weights: before day 1000")
     ax[1].plot(t[rrl.total.shape[0]:rrl.total.shape[0]+rrl_f.total.shape[0]], rrl_f.total, color="green", label="With optimized weights: before day 1000")
     ax[1].set_xlabel("time")
