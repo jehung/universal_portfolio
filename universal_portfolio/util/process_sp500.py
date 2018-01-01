@@ -23,18 +23,21 @@ def read_file(file, test=None):
 
 
 def all_init_data():
-    filepath = 'stock_dfs/'
+    #filepath = stage2
+    filepath = '/Users/Shared/Jenkins/Home/workspace/Test1/'
     alldata = []
     for f in os.listdir(filepath):
         datapath = os.path.join(filepath, f)
+        print(datapath)
         if datapath.endswith('.csv'):
-            # print(datapath)
+            print(datapath)
             Res = read_file(datapath)
             alldata.append(Res)
     alldata = pd.concat(alldata, axis=1)
     alldata.fillna(0, inplace=True)
     alldata
-    alldata.to_csv('../rrl_trading/01_python/all_data_todate.csv')
+    #alldata.to_csv('../rrl_trading/01_python/all_data_todate.csv')
+    alldata.to_csv('all_data_todate.csv')
 
 
 all_init_data()
