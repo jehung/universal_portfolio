@@ -1,10 +1,19 @@
+
+import sys
 import os
+stage='/Users/Shared/Jenkins/Home/workspace/Test1/'
+stage1='/Users/Shared/Jenkins/Home/workspace/Test2/'
+sys.path.append(stage)
+sys.path.append(stage1)
 import time
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import heapq
+import collections
 
 
 def load_bench(bench):
@@ -19,6 +28,7 @@ def load_bench(bench):
     return bench
 
 def load_csv_test(fname):
+    ticker_numbers = collections.defaultdict(dict)
     tmp = pd.read_csv(fname, header=0, low_memory=False)
     print(tmp.head())
     print(tmp.shape)
@@ -263,8 +273,8 @@ class TradingRRL(object):
 def main():
     #fname = '../../util/stock_dfs/A.csv'
     #fname = 'USDJPY30.csv'
-    bench = 'SPY.csv'
-    fname = 'all_data_todate.csv'
+    bench = stage+'SPY.csv'
+    fname = stage1+'all_data_todate.csv'
 
     all_t, all_p = load_csv_test(fname)
     bench = load_bench(bench)
