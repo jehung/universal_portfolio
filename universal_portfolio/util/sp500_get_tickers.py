@@ -1,3 +1,12 @@
+stage2 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs'
+stage3 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/rrl_trading/01_python'
+import sys
+import os
+sys.path.append(os.environ['WORKSPACE'] +
+                '/anaconda/bin/python')
+sys.path.append(stage2)
+sys.path.append(stage3)
+print(sys.path)
 import bs4 as bs
 import datetime as dt
 import os
@@ -8,9 +17,7 @@ import requests
 
 
 today = dt.datetime.now()
-today.year = today.year
-today.month = today.month
-today.day = today.day
+
 
 def save_sp500_tickers():
     resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
@@ -34,10 +41,11 @@ def get_benchmark_from_yahoo(bench='SPY'):
     start = dt.datetime(2008, 1, 1)
     end = dt.datetime(today.year, today.month, today.day)
     df = web.DataReader(bench, "yahoo", start, end)
-    df.to_csv('../rrl_trading/01_python/SPY.csv'.format(bench))
+    #df.to_csv(stage3+'/SPY.csv'.format(bench))
+    df.to_csv('SPY.csv'.format(bench))
     return df
 
-def get_data_from_yahoo(reload_sp500=False):
+def get_data_from_yahoo(reload_sp500=True):
     ticker_count = 0
     if reload_sp500:
         tickers = save_sp500_tickers()
@@ -55,7 +63,8 @@ def get_data_from_yahoo(reload_sp500=False):
         # just in case your connection breaks, we'd like to save our progress!
         try:
             df = web.DataReader(ticker, "yahoo", start, end)
-            df.to_csv('stock_dfs/{}.csv'.format(ticker))
+            #df.to_csv(stage2+'/{}.csv'.format(ticker))
+            df.to_csv('{}.csv'.format(ticker))
             ticker_count += 1
         except:
             continue
