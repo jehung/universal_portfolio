@@ -6,8 +6,14 @@
 # Created            :   August 19, 2009
 # temp
 
+import sys
+import os
+stage='/Users/Shared/Jenkins/Home/workspace/Test1/'
+sys.path.append(stage)
 import numpy as np, random, sys
 import pandas as pd
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 
@@ -115,7 +121,7 @@ def get_changepoints(data, change_points, confidence_level=100, offset=0):
     if not change_points:
         change_points = []
 
-    confidence = bootstrap(data, 100000)
+    confidence = bootstrap(data, 1000)
     if (confidence >= confidence_level):
         cumsum = cumsums(data)
         max_index = find_index_of_maximum(cumsum)
@@ -132,7 +138,7 @@ def get_changepoints(data, change_points, confidence_level=100, offset=0):
 
 
 def main():
-    fname = 'SPY.csv'
+    fname = stage+'SPY.csv'
     raw = readfile(fname)
     data = raw.tolist()
     smoothed = raw.rolling(window=20, min_periods=1).mean().tolist()
@@ -146,8 +152,10 @@ def main():
     plt.plot(data, color='red')
     plt.plot(smoothed, color='blue')
     for c in sorted_changepoints:
-        plt.axvline(x=c, color='g')
-    plt.show()
+        plt.axvline(x=c, color='g', linestyle='--')
+    plt.savefig("benchmark with changepoints.png", dpi=300)
+    plt.close()
+
 
 if __name__ == '__main__':
     main()
