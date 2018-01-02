@@ -1,4 +1,3 @@
-
 import sys
 import os
 stage='/Users/Shared/Jenkins/Home/workspace/Test1/'
@@ -28,14 +27,13 @@ def load_bench(bench):
     return bench
 
 def load_csv_test(fname):
-    ticker_numbers = collections.defaultdict(dict)
     tmp = pd.read_csv(fname, header=0, low_memory=False)
     print(tmp.head())
-    print(tmp.shape)
     tmp.replace(0, np.nan, inplace=True)
     tmp.dropna(axis=1, how='any', inplace=True)
     print('effect check', tmp.shape)
-    # tmp.rename(columns={'Unnamed: 0': 'date'}, inplace=True)
+    tickers_list = tmp.columns.values
+    print('ticker_list', len(tickers_list[1:]), tickers_list[1:])
     tmp_tstr = tmp['Unnamed: 0']
     # tmp_t = [dt.strptime(tmp_tstr[i], '%Y.%m.%d') for i in range(len(tmp_tstr))]
     # tmp_t = [dt.strptime(tmp_tstr[i], '%m/%d/%y') for i in range(len(tmp_tstr))]
@@ -44,7 +42,7 @@ def load_csv_test(fname):
     all_t = np.array(tmp_t)  # [::-1]
     all_p = np.array(tmp_p)  # .reshape((1, -1))[0] # [::-1]
     print('all_p shape', all_p.shape)
-    return all_t, all_p
+    return all_t, all_p, tickers_list
 
 class TradingRRL(object):
     def __init__(self, T=1000, thisT = 1000, M=300, thisM = 300, N=0, init_t=10000, mu=10000, sigma=0.04, rho=1.0, n_epoch=10):
@@ -78,6 +76,8 @@ class TradingRRL(object):
         self.b = np.ones((T+1, N))
         self.total = None
         self.bench = None
+        self.tickers_list = None
+        self.ticker_data = collections.defaultdict(dict)
 
     def quant(self, f):
         fc = f.copy()
@@ -196,12 +196,17 @@ class TradingRRL(object):
         for i in range(self.FS.shape[0]):
             self.FS[i] = np.multiply(self.F[i], self.Sall)
         tmp = np.apply_along_axis(self.select_n, 1, self.FS) # TODO: conisder taking the abs(): magnitutde
-        return np.apply_along_axis(self.softmax, 1, tmp)
-
-
-        #tmp = np.apply_along_axis(self.softmax, 1, self.FS)
-        #return np.apply_along_axis(self.select_n, 1, tmp)
-
+        F1 = np.apply_along_axis(self.softmax, 1, tmp)
+        print('MAKE F1', F1.shape)
+        print('see F1', F1)
+        print('see R', self.R)
+        mask = F1 != 0
+        _, j = np.where(mask)
+        for ji in set(j):
+            self.ticker_data[self.tickers_list[ji]]['inv weight'] = F1[-2, ji]
+            self.ticker_data[self.tickers_list[ji]]['return'] = self.R[-2, ji]
+        print(self.ticker_data)
+        return F1
 
     def select_n(self, array):
         threshold = max(heapq.nlargest(self.TOP, array)[-1], self.threshold)
@@ -253,6 +258,7 @@ class TradingRRL(object):
             pd.DataFrame(self.F1).to_csv("f1.csv", header=False, index=False)
         else:
             self.F1 = self.get_investment_weights(train_phase=False)
+            pd.DataFrame().from_dict(self.ticker_data).T.to_csv('ticker_data.csv')
 
     def load_weight(self):
         tmp = pd.read_csv("w.csv", header=None)
@@ -276,7 +282,7 @@ def main():
     bench = stage+'SPY.csv'
     fname = stage1+'all_data_todate.csv'
 
-    all_t, all_p = load_csv_test(fname)
+    all_t, all_p, tickers_list = load_csv_test(fname)
     bench = load_bench(bench)
 
     init_t = 1001 #1001
@@ -296,12 +302,14 @@ def main():
     ini_rrl.all_t = all_t
     ini_rrl.all_p = all_p
     ini_rrl.bench = bench
+    ini_rrl.tickers_list = tickers_list
     ini_rrl.set_t_p_r()
     ini_rrl.calc_dSdw()
     # RRL agent for training
     rrl = TradingRRL(T, thisT, M, thisM, N, init_t, mu, sigma, rho, n_epoch)
     rrl.all_t = ini_rrl.all_t
     rrl.all_p = ini_rrl.all_p
+    rrl.tickers_list = ini_rrl.tickers_list
     rrl.set_t_p_r()
     rrl.fit()
     rrl.save_weight()
@@ -340,12 +348,14 @@ def main():
     ini_rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
     ini_rrl_f.all_t = ini_rrl.all_t
     ini_rrl_f.all_p = ini_rrl.all_p
+    ini_rrl.tickers_list = ini_rrl.tickers_list
     ini_rrl_f.set_t_p_r(train_phase=False)
     ini_rrl_f.calc_dSdw(train_phase=False)
     # RRL agent with optimized weight.
     rrl_f = TradingRRL(T, thisT, M, thisM, N, init_t+T, mu, sigma, rho, n_epoch)
     rrl_f.all_t = ini_rrl.all_t
     rrl_f.all_p = ini_rrl.all_p
+    rrl_f.tickers_list = ini_rrl.tickers_list
     rrl_f.set_t_p_r(train_phase=False)
     rrl_f.w = rrl.w
     rrl_f.calc_dSdw(train_phase=False)
