@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+import datetime as dt
 
 
 def readfile(filename):
@@ -28,8 +29,8 @@ def readfile(filename):
     #return lines
 
     tmp = pd.read_csv(filename, header=0, low_memory=False)
-    #tmp.set_index('Date', inplace=True)
-    return tmp['Adj Close']
+    tmp.set_index('Date', inplace=True)
+    return tmp
 
 
 def cumsums(data):
@@ -139,7 +140,7 @@ def get_changepoints(data, change_points, confidence_level=100, offset=0):
 
 def main():
     fname = stage+'SPY.csv'
-    raw = readfile(fname)
+    raw = readfile(fname)['Adj Close']
     data = raw.tolist()
     smoothed = raw.rolling(window=20, min_periods=1).mean().tolist()
     print(smoothed)
@@ -147,12 +148,14 @@ def main():
     change_points = []
     points = get_changepoints(smoothed, change_points)
     sorted_changepoints = sorted(points)
-    print(sorted_changepoints)
+    print(sorted_changepoints[-1])
+    latest = raw.index[sorted_changepoints[-1]]
 
     plt.plot(data, color='red')
     plt.plot(smoothed, color='blue')
     for c in sorted_changepoints:
         plt.axvline(x=c, color='g', linestyle='--')
+    plt.title('Latest change point:' + str(latest))
     plt.savefig("benchmark with changepoints.png", dpi=300)
     plt.close()
 
