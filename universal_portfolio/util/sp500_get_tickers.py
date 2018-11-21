@@ -1,22 +1,21 @@
-stage2 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs'
-stage3 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/rrl_trading/01_python'
+#stage2 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/util/stock_dfs'
+#stage3 = '/Users/jennyhung/MathfreakData/Research/MyResearch/UniversalPortfolio/Code/universal_portfolio/universal_portfolio/rrl_trading/01_python'
 import sys
 import os
-sys.path.append(os.environ['WORKSPACE'] +
-                '/anaconda/bin/python')
-sys.path.append(stage2)
-sys.path.append(stage3)
+import pandas as pd
+pd.core.common.is_list_like = pd.api.types.is_list_like
+import pandas_datareader as web
+#sys.path.append(os.environ['WORKSPACE'] +
+#                '/anaconda/bin/python')
+#sys.path.append(stage2)
+#sys.path.append(stage3)
 print(sys.path)
+
 import bs4 as bs
 import datetime as dt
-import os
-import pandas as pd
-import pandas_datareader.data as web
 import pickle
 import requests
 
-
-today = dt.datetime.now()
 
 
 def save_sp500_tickers():
@@ -33,14 +32,12 @@ def save_sp500_tickers():
 
     return tickers
 
-tickers = save_sp500_tickers()
-print(tickers)
-
 
 def get_benchmark_from_yahoo(bench='SPY'):
-    start = dt.datetime(2008, 1, 1)
-    end = dt.datetime(today.year, today.month, today.day)
-    df = web.DataReader(bench, "yahoo", start, end)
+    start = '2008-01-01'
+    end = dt.datetime.today().strftime('%Y-%m-%d')
+    #df = web.DataReader(bench, "yahoo", start, end)
+    df = web.get_data_yahoo(bench, start, end)
     #df.to_csv(stage3+'/SPY.csv'.format(bench))
     df.to_csv('SPY.csv'.format(bench))
     return df
@@ -56,13 +53,13 @@ def get_data_from_yahoo(reload_sp500=True):
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
 
-    start = dt.datetime(2008, 1, 1)
-    end = dt.datetime(today.year, today.month, today.day)
+    start = '2008-01-01'
+    end = dt.datetime.today().strftime('%Y-%m-%d')
 
     for ticker in tickers:
         # just in case your connection breaks, we'd like to save our progress!
         try:
-            df = web.DataReader(ticker, "yahoo", start, end)
+            df = web.get_data_yahoo(ticker, start, end)
             #df.to_csv(stage2+'/{}.csv'.format(ticker))
             df.to_csv('{}.csv'.format(ticker))
             ticker_count += 1
@@ -72,6 +69,10 @@ def get_data_from_yahoo(reload_sp500=True):
     print('Total number of tickers (S&P500): ' + str(len(tickers)))
     print('Total number of processed tickers (S&P500): ' + str(ticker_count))
 
+
+today = dt.datetime.now()
+tickers = save_sp500_tickers()
+print(tickers)
 
 get_benchmark_from_yahoo()
 get_data_from_yahoo(True)
